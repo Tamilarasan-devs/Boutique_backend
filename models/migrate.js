@@ -27,32 +27,52 @@ const runMigrations = async () => {
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
     `).catch(() => {});
 
-    // ── 4. Ensure boutique_settings table exists with name column ─────────────
+    // ── 4. Ensure boutique_settings table exists (minimal — alters fill the rest) ──
     await pool.query(`
       CREATE TABLE IF NOT EXISTS boutique_settings (
         id SERIAL PRIMARY KEY,
-        boutique_id INT NOT NULL UNIQUE REFERENCES boutiques(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL DEFAULT 'Boutique CRM',
-        tagline VARCHAR(255),
-        email VARCHAR(255),
-        phone VARCHAR(50),
-        gst VARCHAR(50),
-        pan VARCHAR(50),
-        address TEXT,
-        city VARCHAR(100),
-        state VARCHAR(100) DEFAULT 'Maharashtra',
-        pincode VARCHAR(20),
-        website VARCHAR(255),
-        currency VARCHAR(10) DEFAULT 'INR',
-        invoice_prefix VARCHAR(20) DEFAULT 'INV',
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // ── 5. Add name column to boutique_settings if missing ────────────────────
+    // ── 5. Patch ALL possibly missing columns in boutique_settings ────────────
+    //    Each runs separately so one failure doesn't block the rest.
+    const settingsAlters = [
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS boutique_id INT;`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT 'Boutique CRM';`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS tagline VARCHAR(255);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS phone VARCHAR(50);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS gst VARCHAR(50);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS pan VARCHAR(50);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS address TEXT;`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS city VARCHAR(100);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS state VARCHAR(100) DEFAULT 'Maharashtra';`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS pincode VARCHAR(20);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS website VARCHAR(255);`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'INR';`,
+      `ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS invoice_prefix VARCHAR(20) DEFAULT 'INV';`,
+    ];
+
+    for (const sql of settingsAlters) {
+      await pool.query(sql).catch((e) => {
+        if (!e.message.includes('already exists')) {
+          console.warn('boutique_settings alter warning:', e.message);
+        }
+      });
+    }
+
+    // ── 6. Add unique constraint on boutique_settings.boutique_id if missing ──
     await pool.query(`
-      ALTER TABLE boutique_settings
-        ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT 'Boutique CRM';
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'boutique_settings_boutique_id_key'
+        ) THEN
+          ALTER TABLE boutique_settings ADD CONSTRAINT boutique_settings_boutique_id_key UNIQUE (boutique_id);
+        END IF;
+      END $$;
     `).catch(() => {});
 
     console.log('✓ Migrations complete');
