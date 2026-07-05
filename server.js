@@ -25,6 +25,7 @@ const { createUsersTable } = require('./models/user');
 const { createSubscriptionsTable } = require('./models/subscription');
 const createSettingsTable = require('./models/settings');
 const { createBoutiquesTable } = require('./models/boutique');
+const { runMigrations } = require('./models/migrate');
 
 // Routes
 const customerRoutes = require('./routes/customerRoutes');
@@ -63,6 +64,7 @@ app.use(express.json());
 // Initialize Database Tables
 const initDB = async () => {
   await createBoutiquesTable(); // Must be first — others reference it
+  await runMigrations();        // Patch any missing columns on existing prod DB
   await createUsersTable();
   await createCustomersTable();
   await createAppointmentsTable();
