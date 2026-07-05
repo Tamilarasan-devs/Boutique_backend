@@ -51,8 +51,8 @@ const register = async (req, res) => {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Email is already registered.' });
     }
-    console.error('Register error:', err.message);
-    res.status(500).json({ error: 'Server error during registration.' });
+    console.error('Register error:', err.message, '| code:', err.code, '| detail:', err.detail, '| stack:', err.stack);
+    res.status(500).json({ error: 'Server error during registration.', detail: err.message });
   }
 };
 
