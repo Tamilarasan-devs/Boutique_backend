@@ -54,9 +54,22 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// app.use(cors());
+const ALLOWED_ORIGINS = [
+  'https://boutique-frontend-eta.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173', // vite preview
+];
+
 app.use(cors({
-  origin: 'https://boutique-frontend-eta.vercel.app'
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. Postman, server-to-server)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
 }));
 
 app.use(express.json());
