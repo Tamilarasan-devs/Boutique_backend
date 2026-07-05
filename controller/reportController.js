@@ -1,13 +1,14 @@
 const pool = require('../config/db');
 
 const getSalesReport = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
     // Total revenue: sum of payments
-    const revRes = await pool.query('SELECT SUM(amount) FROM payments');
+    const revRes = await pool.query('SELECT SUM(amount) FROM payments WHERE boutique_id = $1', [boutique_id]);
     const totalRevenue = parseFloat(revRes.rows[0].sum || 0);
 
     // Total orders: count of orders
-    const orderCountRes = await pool.query('SELECT COUNT(*) FROM orders');
+    const orderCountRes = await pool.query('SELECT COUNT(*) FROM orders WHERE boutique_id = $1', [boutique_id]);
     const totalOrders = parseInt(orderCountRes.rows[0].count, 10);
 
     // Average order value
@@ -18,9 +19,10 @@ const getSalesReport = async (req, res) => {
     const topCustRes = await pool.query(
       `SELECT customer_name as name, SUM(amount)::numeric as spend, COUNT(*)::integer as orders 
        FROM payments 
+       WHERE boutique_id = $1
        GROUP BY customer_name 
        ORDER BY spend DESC 
-       LIMIT 5`
+       LIMIT 5`, [boutique_id]
     );
     const topCustomers = topCustRes.rows.map(row => ({
       name: row.name,
@@ -32,9 +34,9 @@ const getSalesReport = async (req, res) => {
     const chartRes = await pool.query(
       `SELECT to_char(payment_date, 'Dy') as label, SUM(amount)::numeric as value 
        FROM payments 
-       WHERE payment_date >= CURRENT_DATE - INTERVAL '7 days'
+       WHERE payment_date >= CURRENT_DATE - INTERVAL '7 days' AND boutique_id = $1
        GROUP BY to_char(payment_date, 'Dy'), date_trunc('day', payment_date)
-       ORDER BY date_trunc('day', payment_date) ASC`
+       ORDER BY date_trunc('day', payment_date) ASC`, [boutique_id]
     );
 
     const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -62,11 +64,12 @@ const getSalesReport = async (req, res) => {
 };
 
 const getInventoryReport = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
-    const totalItemsRes = await pool.query('SELECT COUNT(*) FROM inventory_items');
+    const totalItemsRes = await pool.query('SELECT COUNT(*) FROM inventory_items WHERE boutique_id = $1', [boutique_id]);
     const totalItems = parseInt(totalItemsRes.rows[0].count, 10);
 
-    const lowStockItemsRes = await pool.query('SELECT name, stock::numeric, unit, min_stock as min FROM inventory_items WHERE stock <= min_stock');
+    const lowStockItemsRes = await pool.query('SELECT name, stock::numeric, unit, min_stock as min FROM inventory_items WHERE stock <= min_stock AND boutique_id = $1', [boutique_id]);
     const lowStockItems = lowStockItemsRes.rows.map(r => ({
       name: r.name,
       stock: parseFloat(r.stock || 0),
@@ -74,13 +77,14 @@ const getInventoryReport = async (req, res) => {
       min: parseFloat(r.min || 0)
     }));
 
-    const totalValueRes = await pool.query('SELECT SUM(stock * price) FROM inventory_items');
+    const totalValueRes = await pool.query('SELECT SUM(stock * price) FROM inventory_items WHERE boutique_id = $1', [boutique_id]);
     const totalValue = parseFloat(totalValueRes.rows[0].sum || 0);
 
     const breakdownRes = await pool.query(
       `SELECT type as category, COUNT(*)::integer as count, SUM(stock * price)::numeric as value 
        FROM inventory_items 
-       GROUP BY type`
+       WHERE boutique_id = $1
+       GROUP BY type`, [boutique_id]
     );
     
     const categoryBreakdown = breakdownRes.rows.map(r => {
@@ -107,33 +111,34 @@ const getInventoryReport = async (req, res) => {
 };
 
 const getFinanceReport = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
-    const revRes = await pool.query('SELECT SUM(amount) FROM payments');
+    const revRes = await pool.query('SELECT SUM(amount) FROM payments WHERE boutique_id = $1', [boutique_id]);
     const totalRevenue = parseFloat(revRes.rows[0].sum || 0);
 
-    const expRes = await pool.query('SELECT SUM(total_amount) FROM purchases');
+    const expRes = await pool.query('SELECT SUM(total_amount) FROM purchases WHERE boutique_id = $1', [boutique_id]);
     const totalExpenses = parseFloat(expRes.rows[0].sum || 0);
 
     const grossProfit = totalRevenue - totalExpenses;
     const netProfit = grossProfit;
 
-    const recRes = await pool.query("SELECT SUM(total_amount) FROM invoices WHERE status IN ('Pending', 'Overdue')");
+    const recRes = await pool.query("SELECT SUM(total_amount) FROM invoices WHERE status IN ('Pending', 'Overdue') AND boutique_id = $1", [boutique_id]);
     const pendingReceivables = parseFloat(recRes.rows[0].sum || 0);
 
     const monthlyRevRes = await pool.query(
       `SELECT to_char(payment_date, 'Mon') as label, SUM(amount)::numeric as revenue 
        FROM payments 
-       WHERE payment_date >= CURRENT_DATE - INTERVAL '6 months'
+       WHERE payment_date >= CURRENT_DATE - INTERVAL '6 months' AND boutique_id = $1
        GROUP BY to_char(payment_date, 'Mon'), date_trunc('month', payment_date)
-       ORDER BY date_trunc('month', payment_date) ASC`
+       ORDER BY date_trunc('month', payment_date) ASC`, [boutique_id]
     );
 
     const monthlyExpRes = await pool.query(
       `SELECT to_char(date, 'Mon') as label, SUM(total_amount)::numeric as expenses 
        FROM purchases 
-       WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+       WHERE date >= CURRENT_DATE - INTERVAL '6 months' AND boutique_id = $1
        GROUP BY to_char(date, 'Mon'), date_trunc('month', date)
-       ORDER BY date_trunc('month', date) ASC`
+       ORDER BY date_trunc('month', date) ASC`, [boutique_id]
     );
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -171,6 +176,7 @@ const getFinanceReport = async (req, res) => {
 };
 
 const getCustomersReport = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
     const query = `
       SELECT c.name,
@@ -178,12 +184,13 @@ const getCustomersReport = async (req, res) => {
              COALESCE(SUM(p.amount), 0)::numeric as total_spend,
              MAX(o.order_date) as last_order
       FROM customers c
-      LEFT JOIN orders o ON o.customer_name = c.name
-      LEFT JOIN payments p ON p.customer_name = c.name
+      LEFT JOIN orders o ON o.customer_name = c.name AND o.boutique_id = c.boutique_id
+      LEFT JOIN payments p ON p.customer_name = c.name AND p.boutique_id = c.boutique_id
+      WHERE c.boutique_id = $1
       GROUP BY c.id, c.name
       ORDER BY total_spend DESC
     `;
-    const result = await pool.query(query);
+    const result = await pool.query(query, [boutique_id]);
 
     const customers = result.rows.map(r => {
       const totalSpend = parseFloat(r.total_spend || 0);
@@ -227,26 +234,27 @@ const getCustomersReport = async (req, res) => {
 
 const exportReport = async (req, res) => {
   const { type } = req.params;
+  const boutique_id = req.user.boutique_id;
 
   try {
     let csvContent = '';
     let filename = `report_${type}_${new Date().toISOString().substring(0, 10)}.csv`;
 
     if (type === 'sales') {
-      const result = await pool.query('SELECT * FROM payments ORDER BY payment_date DESC');
+      const result = await pool.query('SELECT * FROM payments WHERE boutique_id = $1 ORDER BY payment_date DESC', [boutique_id]);
       csvContent = 'Receipt Number,Customer Name,Invoice ID,Amount,Method,Payment Date,Note\n';
       result.rows.forEach(r => {
         csvContent += `"${r.receipt_number}","${r.customer_name}","${r.invoice_id}","${r.amount}","${r.method}","${r.payment_date ? r.payment_date.toISOString() : ''}","${r.note || ''}"\n`;
       });
     } else if (type === 'inventory') {
-      const result = await pool.query('SELECT * FROM inventory_items ORDER BY stock ASC');
+      const result = await pool.query('SELECT * FROM inventory_items WHERE boutique_id = $1 ORDER BY stock ASC', [boutique_id]);
       csvContent = 'Item Code,Item Name,Type,Color,Stock,Min Stock,Price,Unit\n';
       result.rows.forEach(r => {
         csvContent += `"${r.code}","${r.name}","${r.type}","${r.color}","${r.stock}","${r.min_stock}","${r.price}","${r.unit}"\n`;
       });
     } else if (type === 'finance') {
-      const revRes = await pool.query('SELECT * FROM payments ORDER BY payment_date DESC');
-      const expRes = await pool.query('SELECT * FROM purchases ORDER BY date DESC');
+      const revRes = await pool.query('SELECT * FROM payments WHERE boutique_id = $1 ORDER BY payment_date DESC', [boutique_id]);
+      const expRes = await pool.query('SELECT * FROM purchases WHERE boutique_id = $1 ORDER BY date DESC', [boutique_id]);
       csvContent = 'TYPE,REFERENCE,PARTY,AMOUNT,METHOD,DATE,STATUS/NOTE\n';
       revRes.rows.forEach(r => {
         csvContent += `"REVENUE","${r.receipt_number}","${r.customer_name}","${r.amount}","${r.method}","${r.payment_date ? r.payment_date.toISOString() : ''}","${r.note || ''}"\n`;
@@ -260,10 +268,11 @@ const exportReport = async (req, res) => {
                 COUNT(DISTINCT o.id)::integer as orders, 
                 COALESCE(SUM(p.amount), 0)::numeric as spend 
          FROM customers c 
-         LEFT JOIN orders o ON o.customer_name = c.name 
-         LEFT JOIN payments p ON p.customer_name = c.name 
+         LEFT JOIN orders o ON o.customer_name = c.name AND o.boutique_id = c.boutique_id
+         LEFT JOIN payments p ON p.customer_name = c.name AND p.boutique_id = c.boutique_id
+         WHERE c.boutique_id = $1
          GROUP BY c.id, c.name, c.email, c.phone, c.address 
-         ORDER BY spend DESC`
+         ORDER BY spend DESC`, [boutique_id]
       );
       csvContent = 'Customer Name,Email,Phone,Address,Orders Count,Total Spend\n';
       result.rows.forEach(r => {
