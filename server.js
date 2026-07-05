@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { verifyToken } = require('./middleware/auth');
 
 // Models
 const { createCustomersTable } = require('./models/customer');
@@ -52,7 +53,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+// app.use(cors());
+app.use(cors({
+  origin: 'https://boutique-frontend-eta.vercel.app'
+}));
+
 app.use(express.json());
 
 // Initialize Database Tables
@@ -82,30 +87,34 @@ const initDB = async () => {
 initDB();
 
 // Routes
-app.use('/api/customers', customerRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/followups', followupRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/quotations', quotationRoutes);
-app.use('/api/production', productionRoutes);
-app.use('/api/trials', trialRoutes);
-app.use('/api/deliveries', deliveryRoutes);
-app.use('/api/measurement-templates', measurementTemplateRoutes);
-app.use('/api/measurement-history', measurementHistoryRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/leads', leadRoutes);
+app.use('/api/customers', verifyToken, customerRoutes);
+app.use('/api/appointments', verifyToken, appointmentRoutes);
+app.use('/api/followups', verifyToken, followupRoutes);
+app.use('/api/orders', verifyToken, orderRoutes);
+app.use('/api/quotations', verifyToken, quotationRoutes);
+app.use('/api/production', verifyToken, productionRoutes);
+app.use('/api/trials', verifyToken, trialRoutes);
+app.use('/api/deliveries', verifyToken, deliveryRoutes);
+app.use('/api/measurement-templates', verifyToken, measurementTemplateRoutes);
+app.use('/api/measurement-history', verifyToken, measurementHistoryRoutes);
+app.use('/api/inventory', verifyToken, inventoryRoutes);
+app.use('/api/billing', verifyToken, billingRoutes);
+app.use('/api/reports', verifyToken, reportRoutes);
+app.use('/api/employees', verifyToken, employeeRoutes);
+app.use('/api/attendance', verifyToken, attendanceRoutes);
+app.use('/api/email', verifyToken, emailRoutes);
+app.use('/api/leads', verifyToken, leadRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', verifyToken, settingsRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
+  res.send('Boutique CRM API is running...');
+});
+// Basic route
+app.get('/test', (req, res) => {
   res.send('Boutique CRM API is running...');
 });
 

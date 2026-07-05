@@ -72,7 +72,7 @@ const getInvoiceById = async (req, res) => {
 };
 
 const createInvoice = async (req, res) => {
-  const { order_id, customer_name, invoice_date, due_date, total_amount, items } = req.body;
+  const { order_id, quotation_id, customer_name, invoice_date, due_date, total_amount, items } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !due_date || !total_amount || !items) {
@@ -90,12 +90,13 @@ const createInvoice = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO invoices (
-        boutique_id, invoice_number, order_id, customer_name, invoice_date, due_date, total_amount, status, items
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        boutique_id, invoice_number, order_id, quotation_id, customer_name, invoice_date, due_date, total_amount, status, items
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         boutique_id,
         invoice_number,
         order_id || null,
+        quotation_id || null,
         customer_name,
         invoice_date || new Date(),
         due_date,
@@ -106,6 +107,14 @@ const createInvoice = async (req, res) => {
     );
 
     const newInvoice = result.rows[0];
+
+    // If invoice is created from a quotation, mark quotation as Invoiced
+    if (quotation_id) {
+      await pool.query(
+        'UPDATE quotations SET status = $1 WHERE id = $2 AND boutique_id = $3',
+        ['Invoiced', quotation_id, boutique_id]
+      );
+    }
 
     // Emit event
     billingEvents.emit('invoice_created', newInvoice);

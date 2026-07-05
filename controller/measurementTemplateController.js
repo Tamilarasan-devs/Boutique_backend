@@ -2,13 +2,15 @@ const pool = require('../config/db');
 
 // Get all measurement templates
 exports.getAllTemplates = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
     const result = await pool.query(`
       SELECT mt.*, c.name as customer_name
       FROM measurement_templates mt
       LEFT JOIN customers c ON mt.customer_id = c.id
+      WHERE mt.boutique_id = $1
       ORDER BY mt.updated_at DESC
-    `);
+    `, [boutique_id]);
     res.status(200).json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -18,10 +20,11 @@ exports.getAllTemplates = async (req, res) => {
 // Create a new measurement template
 exports.createTemplate = async (req, res) => {
   const { customerId, name, category, garmentType, fields } = req.body;
+  const boutique_id = req.user.boutique_id;
   try {
     const result = await pool.query(
-      'INSERT INTO measurement_templates (customer_id, name, category, garment_type, fields) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [customerId || null, name, category, garmentType, JSON.stringify(fields)]
+      'INSERT INTO measurement_templates (boutique_id, customer_id, name, category, garment_type, fields) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [boutique_id, customerId || null, name, category, garmentType, JSON.stringify(fields)]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -33,10 +36,11 @@ exports.createTemplate = async (req, res) => {
 exports.updateTemplate = async (req, res) => {
   const { id } = req.params;
   const { customerId, name, category, garmentType, fields } = req.body;
+  const boutique_id = req.user.boutique_id;
   try {
     const result = await pool.query(
-      'UPDATE measurement_templates SET customer_id = $1, name = $2, category = $3, garment_type = $4, fields = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *',
-      [customerId || null, name, category, garmentType, JSON.stringify(fields), id]
+      'UPDATE measurement_templates SET customer_id = $1, name = $2, category = $3, garment_type = $4, fields = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 AND boutique_id = $7 RETURNING *',
+      [customerId || null, name, category, garmentType, JSON.stringify(fields), id, boutique_id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Template not found' });
@@ -50,8 +54,9 @@ exports.updateTemplate = async (req, res) => {
 // Delete a measurement template
 exports.deleteTemplate = async (req, res) => {
   const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('DELETE FROM measurement_templates WHERE id = $1 RETURNING *', [id]);
+    const result = await pool.query('DELETE FROM measurement_templates WHERE id = $1 AND boutique_id = $2 RETURNING *', [id, boutique_id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Template not found' });
     }
