@@ -63,15 +63,7 @@ const updateProductionStage = async (req, res) => {
       }
     }
 
-    // Auto-create delivery record when garment reaches "Ready" stage
-    if (stage === 'Ready') {
-      await pool.query(
-        `INSERT INTO deliveries (boutique_id, order_id, customer_name, phone, garment, ready_date, delivery_method, status)
-         VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'Pickup', 'Ready for Pickup')
-         ON CONFLICT DO NOTHING`,
-        [boutique_id, item.order_id || '', item.customer_name, '', item.garment]
-      );
-    }
+
 
     res.status(200).json({ message: 'Production stage updated', production: item });
   } catch (error) {
