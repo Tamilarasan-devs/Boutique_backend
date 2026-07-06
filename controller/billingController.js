@@ -80,11 +80,10 @@ const createInvoice = async (req, res) => {
   }
 
   try {
-    // Generate invoice number e.g. INV-2026-001
+    // Generate invoice number
     const year = new Date(invoice_date || new Date()).getFullYear();
-    const countRes = await pool.query('SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE $1 AND boutique_id = $2', [`INV-${year}-%`, boutique_id]);
-    const nextNum = parseInt(countRes.rows[0].count, 10) + 1;
-    const invoice_number = `INV-${year}-${String(nextNum).padStart(3, '0')}`;
+    const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+    const invoice_number = `INV-${year}-B${boutique_id}-${uniqueSuffix}`;
 
     const itemsStr = typeof items === 'string' ? items : JSON.stringify(items);
 
@@ -213,10 +212,9 @@ const recordPayment = async (req, res) => {
     }
     const invoice = invoiceRes.rows[0];
 
-    // Generate receipt number e.g. PAY-001
-    const countRes = await pool.query('SELECT COUNT(*) FROM payments WHERE boutique_id = $1', [boutique_id]);
-    const nextNum = parseInt(countRes.rows[0].count, 10) + 1;
-    const receipt_number = `PAY-${String(nextNum).padStart(3, '0')}`;
+    // Generate receipt number
+    const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+    const receipt_number = `PAY-B${boutique_id}-${uniqueSuffix}`;
 
     // Insert payment record
     const payResult = await pool.query(
