@@ -92,6 +92,31 @@ const addEmployee = async (req, res) => {
   }
 
   try {
+    // Check for duplicates
+    if (phone || (email && email.trim() !== '')) {
+      let duplicateCheckQuery = 'SELECT id FROM employees WHERE boutique_id = $1 AND (';
+      let queryParams = [boutique_id];
+      let conditions = [];
+      let idx = 2;
+
+      if (phone) {
+        conditions.push(`phone = $${idx}`);
+        queryParams.push(phone);
+        idx++;
+      }
+      if (email && email.trim() !== '') {
+        conditions.push(`email = $${idx}`);
+        queryParams.push(email);
+      }
+      
+      duplicateCheckQuery += conditions.join(' OR ') + ')';
+
+      const existing = await pool.query(duplicateCheckQuery, queryParams);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'An employee with this phone number or email already exists.' });
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO employees (boutique_id, name, email, phone, role, salary, join_date, status, address, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
@@ -114,6 +139,31 @@ const updateEmployee = async (req, res) => {
   if (!role) return res.status(400).json({ error: 'Role is required' });
 
   try {
+    // Check for duplicates
+    if (phone || (email && email.trim() !== '')) {
+      let duplicateCheckQuery = 'SELECT id FROM employees WHERE boutique_id = $1 AND id != $2 AND (';
+      let queryParams = [boutique_id, id];
+      let conditions = [];
+      let idx = 3;
+
+      if (phone) {
+        conditions.push(`phone = $${idx}`);
+        queryParams.push(phone);
+        idx++;
+      }
+      if (email && email.trim() !== '') {
+        conditions.push(`email = $${idx}`);
+        queryParams.push(email);
+      }
+      
+      duplicateCheckQuery += conditions.join(' OR ') + ')';
+
+      const existing = await pool.query(duplicateCheckQuery, queryParams);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'Another employee with this phone number or email already exists.' });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE employees
        SET name=$1, email=$2, phone=$3, role=$4, salary=$5, join_date=$6, status=$7, address=$8, notes=$9

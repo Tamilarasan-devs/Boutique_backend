@@ -9,6 +9,30 @@ const addCustomer = async (req, res) => {
   }
 
   try {
+    // Check for duplicates
+    let duplicateCheckQuery = 'SELECT id FROM customers WHERE boutique_id = $1 AND (';
+    let queryParams = [boutique_id];
+    let conditions = [];
+    let idx = 2;
+
+    if (phone && phone.trim() !== '') {
+      conditions.push(`phone = $${idx}`);
+      queryParams.push(phone.trim());
+      idx++;
+    }
+    if (email && email.trim() !== '') {
+      conditions.push(`email = $${idx}`);
+      queryParams.push(email.trim());
+    }
+
+    if (conditions.length > 0) {
+      duplicateCheckQuery += conditions.join(' OR ') + ')';
+      const existing = await pool.query(duplicateCheckQuery, queryParams);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'A customer with this phone number or email already exists.' });
+      }
+    }
+
     const result = await pool.query(
       'INSERT INTO customers (boutique_id, name, email, phone, address) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [boutique_id, name, email, phone, address]
@@ -105,6 +129,30 @@ const updateCustomer = async (req, res) => {
     return res.status(400).json({ error: 'Name is required' });
   }
   try {
+    // Check for duplicates excluding current customer
+    let duplicateCheckQuery = 'SELECT id FROM customers WHERE boutique_id = $1 AND id != $2 AND (';
+    let queryParams = [boutique_id, id];
+    let conditions = [];
+    let idx = 3;
+
+    if (phone && phone.trim() !== '') {
+      conditions.push(`phone = $${idx}`);
+      queryParams.push(phone.trim());
+      idx++;
+    }
+    if (email && email.trim() !== '') {
+      conditions.push(`email = $${idx}`);
+      queryParams.push(email.trim());
+    }
+
+    if (conditions.length > 0) {
+      duplicateCheckQuery += conditions.join(' OR ') + ')';
+      const existing = await pool.query(duplicateCheckQuery, queryParams);
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'Another customer with this phone number or email already exists.' });
+      }
+    }
+
     const result = await pool.query(
       'UPDATE customers SET name=$1, email=$2, phone=$3, address=$4 WHERE id=$5 AND boutique_id=$6 RETURNING *',
       [name, email, phone, address, id, boutique_id]

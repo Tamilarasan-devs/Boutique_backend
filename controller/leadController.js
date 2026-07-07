@@ -48,6 +48,26 @@ const updateLeadStatus = async (req, res) => {
   }
 };
 
+// @route   PUT /api/leads/:id/full
+const updateLead = async (req, res) => {
+  const { id } = req.params;
+  const { name, phone, source, requirement, value } = req.body;
+  const boutique_id = req.user.boutique_id;
+  try {
+    const result = await pool.query(
+      'UPDATE leads SET name = $1, phone = $2, source = $3, requirement = $4, value = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 AND boutique_id = $7 RETURNING *',
+      [name, phone, source, requirement, value, id, boutique_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: 'Lead not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+};
+
 // @route   DELETE /api/leads/:id
 const deleteLead = async (req, res) => {
   const { id } = req.params;
@@ -68,5 +88,6 @@ module.exports = {
   getLeads,
   addLead,
   updateLeadStatus,
+  updateLead,
   deleteLead
 };

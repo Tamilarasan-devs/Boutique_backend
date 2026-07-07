@@ -58,6 +58,7 @@ const ALLOWED_ORIGINS = [
   'https://boutique-frontend-eta.vercel.app',
   'http://localhost:5173',
   'http://localhost:4173', // vite preview
+  'http://localhost:5174',
 ];
 
 app.use(cors({

@@ -75,7 +75,7 @@ const createInvoice = async (req, res) => {
   const { order_id, quotation_id, customer_name, invoice_date, due_date, total_amount, items } = req.body;
   const boutique_id = req.user.boutique_id;
 
-  if (!customer_name || !due_date || !total_amount || !items) {
+  if (!customer_name || !due_date || total_amount === undefined || total_amount === null || !items) {
     return res.status(400).json({ error: 'Missing required invoice fields' });
   }
 
