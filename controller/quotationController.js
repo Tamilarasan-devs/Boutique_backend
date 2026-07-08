@@ -12,7 +12,7 @@ const getQuotations = async (req, res) => {
 };
 
 const addQuotation = async (req, res) => {
-  const { customer_name, items, total_amount, discount, date, valid_until, terms, status } = req.body;
+  const { customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !items || !total_amount || !valid_until) {
@@ -21,9 +21,9 @@ const addQuotation = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO quotations (boutique_id, customer_name, items, total_amount, discount, date, valid_until, terms, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [boutique_id, customer_name, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft']
+      `INSERT INTO quotations (boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft']
     );
     res.status(201).json({ message: 'Quotation created', quotation: result.rows[0] });
   } catch (error) {

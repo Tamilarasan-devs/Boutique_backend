@@ -76,6 +76,7 @@ const runMigrations = async () => {
 
     // ── STEP 6: followups ─────────────────────────────────────────────────────
     await run(`ALTER TABLE followups ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'followups.boutique_id');
+    await run(`ALTER TABLE followups ADD COLUMN IF NOT EXISTS notes TEXT;`, 'followups.notes');
 
     // ── STEP 7: orders ────────────────────────────────────────────────────────
     await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'orders.boutique_id');
@@ -88,6 +89,8 @@ const runMigrations = async () => {
 
     // ── STEP 8: quotations ────────────────────────────────────────────────────
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'quotations.boutique_id');
+    await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(255);`, 'quotations.customer_phone');
+    await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255);`, 'quotations.customer_email');
 
     // ── STEP 9: production ────────────────────────────────────────────────────
     await run(`ALTER TABLE production ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'production.boutique_id');

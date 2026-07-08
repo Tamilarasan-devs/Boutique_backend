@@ -9,6 +9,7 @@ const createFollowupsTable = async () => {
       channel VARCHAR(50) NOT NULL,
       reason TEXT NOT NULL,
       due_date DATE NOT NULL,
+      notes TEXT,
       status VARCHAR(50) DEFAULT 'Pending',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

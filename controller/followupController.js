@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { EventEmitter } = require('events');
+const calendarService = require('../services/calendarService');
 
 const followupEvents = new EventEmitter();
 
@@ -19,13 +20,16 @@ const sseEvents = (req, res) => {
 
   const onFollowupCreated = (f) => sendSSE('followup_created', f);
   const onFollowupUpdated = (f) => sendSSE('followup_updated', f);
+  const onFollowupDeleted = (data) => sendSSE('followup_deleted', data);
 
   followupEvents.on('followup_created', onFollowupCreated);
   followupEvents.on('followup_updated', onFollowupUpdated);
+  followupEvents.on('followup_deleted', onFollowupDeleted);
 
   req.on('close', () => {
     followupEvents.off('followup_created', onFollowupCreated);
     followupEvents.off('followup_updated', onFollowupUpdated);
+    followupEvents.off('followup_deleted', onFollowupDeleted);
     res.end();
   });
 };
@@ -78,7 +82,15 @@ const addFollowup = async (req, res) => {
       [boutique_id, customer_name, channel, reason, due_date, finalStatus]
     );
     
-    const newFollowup = result.rows[0];
+    let newFollowup = result.rows[0];
+    
+    // Sync with Google Calendar
+    const googleEventId = await calendarService.createCalendarEvent(newFollowup);
+    if (googleEventId) {
+      const updateRes = await pool.query('UPDATE followups SET google_event_id = $1 WHERE id = $2 RETURNING *', [googleEventId, newFollowup.id]);
+      newFollowup = updateRes.rows[0];
+    }
+    
     followupEvents.emit('followup_created', newFollowup);
     
     res.status(201).json({
@@ -110,7 +122,19 @@ const updateFollowupStatus = async (req, res) => {
       return res.status(404).json({ error: 'Followup not found' });
     }
 
-    const updatedFollowup = result.rows[0];
+    let updatedFollowup = result.rows[0];
+    
+    // Sync update with Google Calendar
+    if (updatedFollowup.google_event_id) {
+      await calendarService.updateCalendarEvent(updatedFollowup.google_event_id, updatedFollowup);
+    } else {
+      const googleEventId = await calendarService.createCalendarEvent(updatedFollowup);
+      if (googleEventId) {
+        const updateRes = await pool.query('UPDATE followups SET google_event_id = $1 WHERE id = $2 RETURNING *', [googleEventId, updatedFollowup.id]);
+        updatedFollowup = updateRes.rows[0];
+      }
+    }
+    
     followupEvents.emit('followup_updated', updatedFollowup);
 
     res.status(200).json({
@@ -147,7 +171,19 @@ const updateFollowup = async (req, res) => {
       [finalNotes, due_date, status, id, boutique_id]
     );
 
-    const updatedFollowup = result.rows[0];
+    let updatedFollowup = result.rows[0];
+    
+    // Sync update with Google Calendar
+    if (updatedFollowup.google_event_id) {
+      await calendarService.updateCalendarEvent(updatedFollowup.google_event_id, updatedFollowup);
+    } else {
+      const googleEventId = await calendarService.createCalendarEvent(updatedFollowup);
+      if (googleEventId) {
+        const updateRes = await pool.query('UPDATE followups SET google_event_id = $1 WHERE id = $2 RETURNING *', [googleEventId, updatedFollowup.id]);
+        updatedFollowup = updateRes.rows[0];
+      }
+    }
+    
     followupEvents.emit('followup_updated', updatedFollowup);
 
     res.status(200).json({
@@ -156,6 +192,36 @@ const updateFollowup = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating followup:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+};
+
+const deleteFollowup = async (req, res) => {
+  const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM followups WHERE id = $1 AND boutique_id = $2 RETURNING *',
+      [id, boutique_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Followup not found' });
+    }
+
+    const deletedFollowup = result.rows[0];
+
+    // Sync deletion with Google Calendar
+    if (deletedFollowup.google_event_id) {
+      await calendarService.deleteCalendarEvent(deletedFollowup.google_event_id);
+    }
+
+    followupEvents.emit('followup_deleted', { id, boutique_id });
+
+    res.status(200).json({ message: 'Followup deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting followup:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -166,4 +232,5 @@ module.exports = {
   addFollowup,
   updateFollowupStatus,
   updateFollowup,
+  deleteFollowup,
 };
