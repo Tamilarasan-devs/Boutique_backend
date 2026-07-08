@@ -179,7 +179,7 @@ const getCustomersReport = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
     const query = `
-      SELECT c.name,
+      SELECT c.name, c.loyalty_points,
              COUNT(DISTINCT o.id)::integer as orders,
              COALESCE(SUM(p.amount), 0)::numeric as total_spend,
              MAX(o.order_date) as last_order
@@ -212,7 +212,8 @@ const getCustomersReport = async (req, res) => {
         totalSpend,
         avgOrder,
         loyalty,
-        lastOrder: r.last_order ? r.last_order.toISOString().substring(0, 10) : 'N/A'
+        loyaltyPoints: r.loyalty_points || 0,
+        lastOrder: r.last_order ? new Date(r.last_order).toLocaleDateString() : 'Never'
       };
     });
 

@@ -100,7 +100,7 @@ const markAttendance = async (req, res) => {
   if (!employee_id) return res.status(400).json({ error: 'employee_id is required' });
 
   const attendanceDate = date || new Date().toISOString().split('T')[0];
-  const attendanceStatus = status || 'Present';
+  const attendanceStatus = status || 'Login';
 
   try {
     const result = await pool.query(
@@ -138,7 +138,7 @@ const bulkMarkAttendance = async (req, res) => {
       const empResult = await pool.query(`SELECT id FROM employees WHERE status = 'Active'`);
       toInsert = empResult.rows.map(e => ({
         employee_id: e.id,
-        status: status || 'Present',
+        status: status || 'Login',
         check_in: null,
         check_out: null,
         notes: null
@@ -160,7 +160,7 @@ const bulkMarkAttendance = async (req, res) => {
       attendanceDate,
       r.check_in || null,
       r.check_out || null,
-      r.status || 'Present',
+      r.status || 'Login',
       r.notes || null
     ]);
 
@@ -192,7 +192,7 @@ const updateAttendance = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE attendance SET check_in=$1, check_out=$2, status=$3, notes=$4 WHERE id=$5 RETURNING *`,
-      [check_in || null, check_out || null, status || 'Present', notes || null, id]
+      [check_in || null, check_out || null, status || 'Login', notes || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Attendance record not found' });
     res.status(200).json({ message: 'Attendance updated successfully', attendance: result.rows[0] });
@@ -238,7 +238,7 @@ const getAttendanceSummary = async (req, res) => {
          e.id AS employee_id,
          e.name AS employee_name,
          e.role AS employee_role,
-         COUNT(*) FILTER (WHERE a.status = 'Present') AS present_days,
+         COUNT(*) FILTER (WHERE a.status = 'Login') AS present_days,
          COUNT(*) FILTER (WHERE a.status = 'Absent') AS absent_days,
          COUNT(*) FILTER (WHERE a.status = 'Half-Day') AS half_days,
          COUNT(*) FILTER (WHERE a.status = 'Late') AS late_days,

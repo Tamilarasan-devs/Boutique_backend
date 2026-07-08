@@ -28,7 +28,7 @@ const formatEvent = (followup) => {
   const date = followup.due_date ? new Date(followup.due_date) : new Date();
   const dateString = date.toISOString().split('T')[0];
   
-  return {
+  const event = {
     summary: `Follow-up: ${followup.customer_name}`,
     description: `Reason: ${followup.reason}\n\nStatus: ${followup.status || 'Pending'}\nChannel: ${followup.channel}\n\nNotes: ${followup.notes || ''}`,
     start: {
@@ -42,6 +42,12 @@ const formatEvent = (followup) => {
     // Optional: Add color coding based on status
     colorId: followup.status === 'Completed' ? '8' : (followup.status === 'Overdue' ? '11' : '9'),
   };
+
+  if (followup.customer_email) {
+    event.attendees = [{ email: followup.customer_email }];
+  }
+
+  return event;
 };
 
 const createCalendarEvent = async (followup) => {

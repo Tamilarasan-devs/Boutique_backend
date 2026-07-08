@@ -6,7 +6,7 @@ exports.getCompanyProfile = async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM boutique_settings WHERE boutique_id = $1', [boutique_id]);
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Settings not found' });
+      return res.json({ name: 'Your Boutique' });
     }
     res.json(result.rows[0]);
   } catch (error) {
@@ -20,13 +20,14 @@ exports.updateCompanyProfile = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   const {
     name, tagline, email, phone, gst, pan,
-    address, city, state, pincode, website, currency, invoicePrefix
+    address, city, state, pincode, website, currency, invoicePrefix,
+    loyalty_enabled, points_per_unit, redemption_value
   } = req.body;
 
   try {
     const updateQuery = `
-      INSERT INTO boutique_settings (boutique_id, name, tagline, email, phone, gst, pan, address, city, state, pincode, website, currency, invoice_prefix)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      INSERT INTO boutique_settings (boutique_id, name, tagline, email, phone, gst, pan, address, city, state, pincode, website, currency, invoice_prefix, loyalty_enabled, points_per_unit, redemption_value)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       ON CONFLICT (boutique_id) DO UPDATE SET
         name = COALESCE(EXCLUDED.name, boutique_settings.name),
         tagline = COALESCE(EXCLUDED.tagline, boutique_settings.tagline),
@@ -41,14 +42,18 @@ exports.updateCompanyProfile = async (req, res) => {
         website = COALESCE(EXCLUDED.website, boutique_settings.website),
         currency = COALESCE(EXCLUDED.currency, boutique_settings.currency),
         invoice_prefix = COALESCE(EXCLUDED.invoice_prefix, boutique_settings.invoice_prefix),
+        loyalty_enabled = COALESCE(EXCLUDED.loyalty_enabled, boutique_settings.loyalty_enabled),
+        points_per_unit = COALESCE(EXCLUDED.points_per_unit, boutique_settings.points_per_unit),
+        redemption_value = COALESCE(EXCLUDED.redemption_value, boutique_settings.redemption_value),
         updated_at = CURRENT_TIMESTAMP
       RETURNING *;
     `;
 
     const values = [
       boutique_id, name, tagline, email, phone, gst, pan,
-      address, city, state, pincode, website, currency, invoicePrefix
-    ];
+      address, city, state, pincode, website, currency, invoicePrefix,
+      loyalty_enabled, points_per_unit, redemption_value
+    ].map(v => v === undefined ? null : v);
 
     const result = await pool.query(updateQuery, values);
     

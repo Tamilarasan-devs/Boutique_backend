@@ -35,9 +35,11 @@ const getEmployees = async (req, res) => {
         0
       )::integer AS active_orders_count,
       COALESCE(
-        (SELECT COUNT(*) FROM attendance a WHERE a.employee_id = e.id AND a.date >= date_trunc('month', CURRENT_DATE) AND a.status = 'Present'),
+        (SELECT COUNT(*) FROM attendance a WHERE a.employee_id = e.id AND a.date >= date_trunc('month', CURRENT_DATE) AND a.status = 'Login'),
         0
-      )::integer AS present_this_month
+      )::integer AS present_this_month,
+      e.status,
+      e.created_at
     FROM employees e
     ${whereClause}
     ORDER BY e.created_at DESC

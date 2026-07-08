@@ -60,7 +60,7 @@ const getFollowups = async (req, res) => {
 };
 
 const addFollowup = async (req, res) => {
-  const { customer_name, channel, reason, due_date, status } = req.body;
+  const { customer_name, customer_email, channel, reason, due_date, status } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !channel || !reason || !due_date) {
@@ -78,8 +78,8 @@ const addFollowup = async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO followups (boutique_id, customer_name, channel, reason, due_date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [boutique_id, customer_name, channel, reason, due_date, finalStatus]
+      'INSERT INTO followups (boutique_id, customer_name, customer_email, channel, reason, due_date, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [boutique_id, customer_name, customer_email, channel, reason, due_date, finalStatus]
     );
     
     let newFollowup = result.rows[0];

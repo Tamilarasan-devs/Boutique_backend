@@ -8,7 +8,7 @@ const createAttendanceTable = async () => {
       date DATE NOT NULL DEFAULT CURRENT_DATE,
       check_in TIME,
       check_out TIME,
-      status VARCHAR(20) NOT NULL DEFAULT 'Present',
+      status VARCHAR(20) NOT NULL DEFAULT 'Login',
       notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(employee_id, date)
