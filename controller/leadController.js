@@ -23,8 +23,8 @@ const addLead = async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error("ADD_LEAD ERROR:", err);
+    res.status(500).json({ error: 'Server Error', details: err.message });
   }
 };
 

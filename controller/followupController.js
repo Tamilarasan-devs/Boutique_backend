@@ -60,7 +60,7 @@ const getFollowups = async (req, res) => {
 };
 
 const addFollowup = async (req, res) => {
-  const { customer_name, customer_email, channel, reason, due_date, status } = req.body;
+  const { customer_name, customer_phone, channel, reason, due_date, status } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !channel || !reason || !due_date) {
@@ -78,8 +78,8 @@ const addFollowup = async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO followups (boutique_id, customer_name, customer_email, channel, reason, due_date, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [boutique_id, customer_name, customer_email, channel, reason, due_date, finalStatus]
+      'INSERT INTO followups (boutique_id, customer_name, customer_phone, channel, reason, due_date, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [boutique_id, customer_name, customer_phone, channel, reason, due_date, finalStatus]
     );
     
     let newFollowup = result.rows[0];
@@ -161,8 +161,10 @@ const updateFollowup = async (req, res) => {
     const existingNotes = getRes.rows[0].notes || '';
     let finalNotes = existingNotes;
     if (notes && notes.trim().length > 0) {
-      const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      const newEntry = `[${dateStr}]: ${notes.trim()}`;
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const newEntry = `[${dateStr} ${timeStr}]: ${notes.trim()}`;
       finalNotes = existingNotes ? `${existingNotes}\n${newEntry}` : newEntry;
     }
 
