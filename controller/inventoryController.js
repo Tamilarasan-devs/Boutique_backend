@@ -152,6 +152,37 @@ const addPurchase = async (req, res) => {
   }
 };
 
+const updatePurchase = async (req, res) => {
+  const { id } = req.params;
+  const { po_number, supplier, items, total_amount, status } = req.body;
+  const boutique_id = req.user.boutique_id;
+  try {
+    const result = await pool.query(
+      `UPDATE purchases SET po_number=$1, supplier=$2, items=$3, total_amount=$4, status=$5
+       WHERE id=$6 AND boutique_id=$7 RETURNING *`,
+      [po_number, supplier, items, total_amount, status, id, boutique_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Purchase not found' });
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating purchase:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const deletePurchase = async (req, res) => {
+  const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
+  try {
+    const result = await pool.query('DELETE FROM purchases WHERE id = $1 AND boutique_id = $2 RETURNING *', [id, boutique_id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Purchase not found' });
+    res.status(200).json({ message: 'Purchase deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 const updatePurchaseStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -223,6 +254,8 @@ module.exports = {
   deleteItem,
   getPurchases,
   addPurchase,
+  updatePurchase,
+  deletePurchase,
   updatePurchaseStatus,
   getStockLedger,
   addStockLedger

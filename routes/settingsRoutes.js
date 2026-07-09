@@ -8,10 +8,13 @@ router.get('/company', settingsController.getCompanyProfile);
 
 // Only Owner and Manager can update company profile
 router.put(
-  '/company', 
-  verifyToken, 
-  requireRole('owner', 'manager'), 
+  '/company',
+  verifyToken,
+  requireRole('owner', 'manager'),
   settingsController.updateCompanyProfile
 );
+
+router.get('/roles', verifyToken, settingsController.getRoles);
+router.put('/roles/:role', verifyToken, requireRole('owner'), settingsController.updateRolePermissions);
 
 module.exports = router;

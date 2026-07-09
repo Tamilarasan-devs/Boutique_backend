@@ -5,9 +5,11 @@ const pool = require('../config/db');
 const getAttendance = async (req, res) => {
   const { date, employee_id, status, page, limit } = req.query;
 
-  let conditions = [];
-  const params = [];
-  let idx = 1;
+  const boutique_id = req.user.boutique_id;
+  
+  let conditions = [`e.boutique_id = $1`];
+  const params = [boutique_id];
+  let idx = 2;
 
   if (date) {
     conditions.push(`a.date = $${idx}`);
@@ -65,6 +67,7 @@ const getAttendance = async (req, res) => {
 const getAttendanceByDate = async (req, res) => {
   const { date } = req.query;
   const targetDate = date || new Date().toISOString().split('T')[0];
+  const boutique_id = req.user.boutique_id;
 
   try {
     const result = await pool.query(
@@ -82,9 +85,9 @@ const getAttendanceByDate = async (req, res) => {
          a.notes
        FROM employees e
        LEFT JOIN attendance a ON a.employee_id = e.id AND a.date = $1
-       WHERE e.status = 'Active'
+       WHERE e.status = 'Active' AND e.boutique_id = $2
        ORDER BY e.name ASC`,
-      [targetDate]
+      [targetDate, boutique_id]
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -96,6 +99,7 @@ const getAttendanceByDate = async (req, res) => {
 // POST /api/attendance — mark/upsert single record
 const markAttendance = async (req, res) => {
   const { employee_id, date, check_in, check_out, status, notes } = req.body;
+  const boutique_id = req.user.boutique_id;
 
   if (!employee_id) return res.status(400).json({ error: 'employee_id is required' });
 
@@ -103,6 +107,9 @@ const markAttendance = async (req, res) => {
   const attendanceStatus = status || 'Login';
 
   try {
+    // Verify employee belongs to boutique
+    const empCheck = await pool.query('SELECT id FROM employees WHERE id = $1 AND boutique_id = $2', [employee_id, boutique_id]);
+    if (empCheck.rows.length === 0) return res.status(403).json({ error: 'Unauthorized or employee not found' });
     const result = await pool.query(
       `INSERT INTO attendance (employee_id, date, check_in, check_out, status, notes)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -125,8 +132,7 @@ const markAttendance = async (req, res) => {
 // POST /api/attendance/bulk — mark all active employees for a date
 const bulkMarkAttendance = async (req, res) => {
   const { date, status, records } = req.body;
-  // records: optional array of { employee_id, status, check_in, check_out, notes }
-  // If records provided, use those; else mark all active employees with the given status
+  const boutique_id = req.user.boutique_id;
 
   const attendanceDate = date || new Date().toISOString().split('T')[0];
 
@@ -135,7 +141,7 @@ const bulkMarkAttendance = async (req, res) => {
 
     if (!toInsert || toInsert.length === 0) {
       // Fetch all active employees and mark them
-      const empResult = await pool.query(`SELECT id FROM employees WHERE status = 'Active'`);
+      const empResult = await pool.query(`SELECT id FROM employees WHERE status = 'Active' AND boutique_id = $1`, [boutique_id]);
       toInsert = empResult.rows.map(e => ({
         employee_id: e.id,
         status: status || 'Login',
@@ -188,13 +194,17 @@ const bulkMarkAttendance = async (req, res) => {
 const updateAttendance = async (req, res) => {
   const { id } = req.params;
   const { check_in, check_out, status, notes } = req.body;
+  const boutique_id = req.user.boutique_id;
 
   try {
+    // Verify attendance belongs to boutique
+    const verify = await pool.query('SELECT a.id FROM attendance a JOIN employees e ON a.employee_id = e.id WHERE a.id = $1 AND e.boutique_id = $2', [id, boutique_id]);
+    if (verify.rows.length === 0) return res.status(404).json({ error: 'Attendance record not found or unauthorized' });
+
     const result = await pool.query(
       `UPDATE attendance SET check_in=$1, check_out=$2, status=$3, notes=$4 WHERE id=$5 RETURNING *`,
       [check_in || null, check_out || null, status || 'Login', notes || null, id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Attendance record not found' });
     res.status(200).json({ message: 'Attendance updated successfully', attendance: result.rows[0] });
   } catch (error) {
     console.error('Error updating attendance:', error);
@@ -205,9 +215,12 @@ const updateAttendance = async (req, res) => {
 // DELETE /api/attendance/:id
 const deleteAttendance = async (req, res) => {
   const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('DELETE FROM attendance WHERE id=$1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Attendance record not found' });
+    const verify = await pool.query('SELECT a.id FROM attendance a JOIN employees e ON a.employee_id = e.id WHERE a.id = $1 AND e.boutique_id = $2', [id, boutique_id]);
+    if (verify.rows.length === 0) return res.status(404).json({ error: 'Attendance record not found or unauthorized' });
+
+    await pool.query('DELETE FROM attendance WHERE id=$1', [id]);
     res.status(200).json({ message: 'Attendance deleted successfully' });
   } catch (error) {
     console.error('Error deleting attendance:', error);
@@ -219,13 +232,14 @@ const deleteAttendance = async (req, res) => {
 const getAttendanceSummary = async (req, res) => {
   const { month, employee_id } = req.query;
   const targetMonth = month || new Date().toISOString().slice(0, 7); // YYYY-MM
+  const boutique_id = req.user.boutique_id;
 
-  let conditions = [`TO_CHAR(a.date, 'YYYY-MM') = $1`];
-  const params = [targetMonth];
-  let idx = 2;
+  let conditions = [`e.status = 'Active'`, `e.boutique_id = $1`];
+  const params = [boutique_id, targetMonth];
+  let idx = 3;
 
   if (employee_id) {
-    conditions.push(`a.employee_id = $${idx}`);
+    conditions.push(`e.id = $${idx}`);
     params.push(employee_id);
     idx++;
   }
@@ -238,13 +252,16 @@ const getAttendanceSummary = async (req, res) => {
          e.id AS employee_id,
          e.name AS employee_name,
          e.role AS employee_role,
-         COUNT(*) FILTER (WHERE a.status = 'Login') AS present_days,
-         COUNT(*) FILTER (WHERE a.status = 'Absent') AS absent_days,
-         COUNT(*) FILTER (WHERE a.status = 'Half-Day') AS half_days,
-         COUNT(*) FILTER (WHERE a.status = 'Late') AS late_days,
-         COUNT(*) AS total_marked
-       FROM attendance a
-       JOIN employees e ON e.id = a.employee_id
+         COUNT(a.id) FILTER (WHERE a.status = 'Login') AS present_days,
+         COUNT(a.id) FILTER (WHERE a.status = 'Absent') AS absent_days,
+         COUNT(a.id) FILTER (WHERE a.status = 'Half-Day') AS half_days,
+         COUNT(a.id) FILTER (WHERE a.status = 'Late') AS late_days,
+         COUNT(a.id) AS total_marked,
+         json_agg(
+           json_build_object('date', TO_CHAR(a.date, 'YYYY-MM-DD'), 'status', a.status)
+         ) FILTER (WHERE a.id IS NOT NULL) AS daily_records
+       FROM employees e
+       LEFT JOIN attendance a ON a.employee_id = e.id AND TO_CHAR(a.date, 'YYYY-MM') = $2
        ${whereClause}
        GROUP BY e.id, e.name, e.role
        ORDER BY e.name ASC`,

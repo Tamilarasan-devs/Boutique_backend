@@ -22,6 +22,7 @@ const { createAttendanceTable } = require('./models/attendance');
 const { createEmailLogsTable } = require('./models/emailLog');
 const { createLeadsTable } = require('./models/lead');
 const { createUsersTable } = require('./models/user');
+const { createRolePermissionsTable } = require('./models/rolePermissions');
 const { createSubscriptionsTable } = require('./models/subscription');
 const createSettingsTable = require('./models/settings');
 const { createBoutiquesTable } = require('./models/boutique');
@@ -98,6 +99,8 @@ const initDB = async () => {
   await createAttendanceTable();
   await createEmailLogsTable();
   await createLeadsTable();
+  await createUsersTable();
+  await createRolePermissionsTable();
   await createSubscriptionsTable();
   await createSettingsTable();
 };

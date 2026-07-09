@@ -5,6 +5,15 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'boutique_crm_secret_key';
 const JWT_EXPIRES_IN = '7d';
 
+// Default system role definitions
+const defaultRolePermissions = {
+  owner: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'Full' },
+  manager: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'None' },
+  sales_staff: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'None', 'Measurements': 'Read', 'Inventory': 'None', 'Billing': 'Full', 'Staff Management': 'None', 'Marketing': 'Full', 'Admin Settings': 'None' },
+  tailor: { 'Dashboard': 'Read', 'CRM': 'None', 'Orders': 'Read', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Read', 'Billing': 'None', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' },
+  receptionist: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Read', 'Production': 'None', 'Measurements': 'None', 'Inventory': 'None', 'Billing': 'Read', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' }
+};
+
 // ─── Helper: sign token ───────────────────────────────────────────────────────
 const signToken = (user) =>
   jwt.sign(
@@ -72,18 +81,30 @@ const login = async (req, res) => {
     const user = result.rows[0];
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'User not found. Please check your email.' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+    }
+
+    // Fetch custom permissions for this role and boutique
+    let permissions = defaultRolePermissions[user.role] || [];
+    if (user.role !== 'owner') {
+      const permResult = await pool.query(
+        'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
+        [user.boutique_id, user.role]
+      );
+      if (permResult.rows.length > 0) {
+        permissions = permResult.rows[0].permissions;
+      }
     }
 
     const token = signToken(user);
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, boutique_id: user.boutique_id }
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, boutique_id: user.boutique_id, permissions }
     });
   } catch (err) {
     console.error('Login error:', err.message);
@@ -132,7 +153,20 @@ const getMe = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found.' });
     }
-    res.json(result.rows[0]);
+    const user = result.rows[0];
+
+    let permissions = defaultRolePermissions[user.role] || [];
+    if (user.role !== 'owner') {
+      const permResult = await pool.query(
+        'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
+        [user.boutique_id, user.role]
+      );
+      if (permResult.rows.length > 0) {
+        permissions = permResult.rows[0].permissions;
+      }
+    }
+
+    res.json({ ...user, permissions });
   } catch (err) {
     console.error('GetMe error:', err.message);
     res.status(500).json({ error: 'Server error.' });

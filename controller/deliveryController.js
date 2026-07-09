@@ -3,7 +3,13 @@ const pool = require('../config/db');
 const getDeliveries = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM deliveries WHERE boutique_id = $1 ORDER BY created_at DESC', [boutique_id]);
+    const result = await pool.query(`
+      SELECT d.*, COALESCE(NULLIF(d.phone, ''), c.phone, '') as phone
+      FROM deliveries d
+      LEFT JOIN customers c ON d.customer_name = c.name AND d.boutique_id = c.boutique_id
+      WHERE d.boutique_id = $1
+      ORDER BY d.created_at DESC
+    `, [boutique_id]);
     res.status(200).json(result.rows);
   } catch (error) {
     console.error('Error fetching deliveries:', error);
@@ -20,10 +26,16 @@ const addDelivery = async (req, res) => {
   }
 
   try {
+    let final_phone = phone;
+    if (!final_phone && customer_name) {
+      const custRes = await pool.query('SELECT phone FROM customers WHERE name = $1 AND boutique_id = $2', [customer_name, boutique_id]);
+      if (custRes.rows.length > 0) final_phone = custRes.rows[0].phone;
+    }
+
     const result = await pool.query(
       `INSERT INTO deliveries (boutique_id, order_id, customer_name, phone, garment, ready_date, delivery_method, tracking_number, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [boutique_id, order_id || '', customer_name, phone || '', garment, ready_date, delivery_method || 'Pickup', tracking_number || '', status || 'Ready for Pickup']
+      [boutique_id, order_id || '', customer_name, final_phone || '', garment, ready_date, delivery_method || 'Pickup', tracking_number || '', status || 'Ready for Pickup']
     );
     res.status(201).json({ message: 'Delivery added', delivery: result.rows[0] });
   } catch (error) {

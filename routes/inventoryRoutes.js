@@ -11,6 +11,8 @@ const {
   deleteItem,
   getPurchases,
   addPurchase,
+  updatePurchase,
+  deletePurchase,
   updatePurchaseStatus,
   getStockLedger,
   addStockLedger
@@ -31,6 +33,8 @@ router.delete('/items/:id', deleteItem);
 // Purchases
 router.get('/purchases', getPurchases);
 router.post('/purchases', addPurchase);
+router.put('/purchases/:id', updatePurchase);
+router.delete('/purchases/:id', deletePurchase);
 router.put('/purchases/:id/status', updatePurchaseStatus);
 
 // Stock Ledger
