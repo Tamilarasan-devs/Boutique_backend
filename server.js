@@ -59,6 +59,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4173', // vite preview
   'http://localhost:5174',
+  'https://crm-boutique.netlify.app'
 ];
 
 app.use(cors({
