@@ -126,6 +126,21 @@ const runMigrations = async () => {
     // ── STEP 18: email_logs ───────────────────────────────────────────────────
     await run(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'email_logs.boutique_id');
 
+    // ── STEP 19: Sequence Table & Display IDs ─────────────────────────────────
+    await run(`
+      CREATE TABLE IF NOT EXISTS boutique_sequences (
+        boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE,
+        entity_type VARCHAR(50) NOT NULL,
+        next_value INT NOT NULL DEFAULT 1,
+        UNIQUE(boutique_id, entity_type)
+      );
+    `, 'boutique_sequences table');
+
+    const tablesWithDisplayId = ['orders', 'quotations', 'production', 'trials', 'appointments', 'followups', 'leads', 'invoices', 'payments', 'deliveries'];
+    for (const table of tablesWithDisplayId) {
+      await run(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS display_id VARCHAR(50);`, `${table}.display_id`);
+    }
+
     console.log('[migrate] ✓ All migrations complete');
   } catch (err) {
     console.error('[migrate] Fatal error:', err.message);

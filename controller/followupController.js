@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 const { EventEmitter } = require('events');
 const calendarService = require('../services/calendarService');
 
@@ -77,9 +78,11 @@ const addFollowup = async (req, res) => {
       finalStatus = 'Overdue';
     }
 
+    const display_id = await generateDisplayId(boutique_id, 'followup', 'FOL');
+
     const result = await pool.query(
-      'INSERT INTO followups (boutique_id, customer_name, customer_phone, channel, reason, due_date, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [boutique_id, customer_name, customer_phone, channel, reason, due_date, finalStatus]
+      'INSERT INTO followups (boutique_id, customer_name, customer_phone, channel, reason, due_date, status, display_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [boutique_id, customer_name, customer_phone, channel, reason, due_date, finalStatus, display_id]
     );
     
     let newFollowup = result.rows[0];

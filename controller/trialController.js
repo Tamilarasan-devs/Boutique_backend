@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 const getTrials = async (req, res) => {
   const boutique_id = req.user.boutique_id;
@@ -20,10 +21,12 @@ const addTrial = async (req, res) => {
   }
 
   try {
+    const display_id = await generateDisplayId(boutique_id, 'trial', 'TRL');
+
     const result = await pool.query(
-      `INSERT INTO trials (boutique_id, order_id, customer_name, garment, date, time, tailor, alteration_notes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [boutique_id, order_id || '', customer_name, garment, date, time, tailor || '', alteration_notes || '', status || 'Scheduled']
+      `INSERT INTO trials (boutique_id, order_id, customer_name, garment, date, time, tailor, alteration_notes, status, display_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [boutique_id, order_id || '', customer_name, garment, date || new Date(), time || '00:00', tailor || '', alteration_notes || '', status || 'Scheduled', display_id]
     );
     res.status(201).json({ message: 'Trial scheduled', trial: result.rows[0] });
   } catch (error) {

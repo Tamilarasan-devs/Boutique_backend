@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 const getProduction = async (req, res) => {
   const boutique_id = req.user.boutique_id;
@@ -20,10 +21,12 @@ const addProduction = async (req, res) => {
   }
 
   try {
+    const display_id = await generateDisplayId(boutique_id, 'production', 'PRD');
+
     const result = await pool.query(
-      `INSERT INTO production (boutique_id, order_id, customer_name, garment, tailor, stage, priority, start_date, expected_end_date, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [boutique_id, order_id || '', customer_name, garment, tailor || '', stage || 'Cutting', priority || 'Medium', start_date || new Date(), expected_end_date, notes || '']
+      `INSERT INTO production (boutique_id, order_id, customer_name, garment, tailor, stage, priority, start_date, expected_end_date, notes, display_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [boutique_id, order_id || '', customer_name, garment, tailor || '', stage || 'Cutting', priority || 'Medium', start_date || new Date(), expected_end_date, notes || '', display_id]
     );
     res.status(201).json({ message: 'Production item added', production: result.rows[0] });
   } catch (error) {
@@ -53,12 +56,29 @@ const updateProductionStage = async (req, res) => {
     };
 
     if (item.order_id) {
-      const orderDbId = item.order_id.replace('ORD-', '');
+      // Handle both old formats (ORD-22) and new direct numeric IDs (22)
+      // Since order_id might be display_id (ORD-001) in the future, we need to query by it.
+      // But for now, frontend will send the numeric ID. If it has ORD- prefix, strip it (legacy fallback).
+      let queryColumn = 'id';
+      let queryValue = item.order_id;
+      
+      if (item.order_id.startsWith('ORD-')) {
+        const potentialNum = parseInt(item.order_id.replace('ORD-', ''), 10);
+        if (!isNaN(potentialNum)) {
+           queryValue = potentialNum;
+        } else {
+           // It's a display_id like ORD-001
+           queryColumn = 'display_id';
+        }
+      } else if (!isNaN(parseInt(item.order_id, 10))) {
+        queryValue = parseInt(item.order_id, 10);
+      }
+
       const mappedStatus = stageToOrderStatusMap[stage];
       if (mappedStatus) {
         await pool.query(
-          'UPDATE orders SET status = $1 WHERE id = $2 AND boutique_id = $3',
-          [mappedStatus, orderDbId, boutique_id]
+          `UPDATE orders SET status = $1 WHERE ${queryColumn} = $2 AND boutique_id = $3`,
+          [mappedStatus, queryValue, boutique_id]
         );
       }
     }

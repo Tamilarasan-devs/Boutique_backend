@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 // Helper to get or create customer by name
 const getOrCreateCustomer = async (customer_name, boutique_id) => {
@@ -80,17 +81,19 @@ const addOrder = async (req, res) => {
 
     const points_earned = await processLoyaltyPoints(boutique_id, customer_name, final_total, status || 'Received');
 
+    const display_id = await generateDisplayId(boutique_id, 'order', 'ORD');
+
     const result = await pool.query(
       `INSERT INTO orders (
         boutique_id, customer_name, category, stitching_cost, total_amount, advance_paid,
         delivery_date, order_date, tailor, fabric_details, priority, status,
-        loyalty_discount, points_redeemed, points_earned
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+        loyalty_discount, points_redeemed, points_earned, display_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
       [
         boutique_id, customer_name, category, stitching_cost || 0, final_total, advance_paid || 0,
         delivery_date, order_date || new Date(), tailor || '', fabric_details || '',
         priority || 'Normal', status || 'Received',
-        loyalty_discount, redeemed, points_earned
+        loyalty_discount, redeemed, points_earned, display_id
       ]
     );
     
@@ -177,11 +180,13 @@ const convertFromQuotation = async (req, res) => {
     // Mark quotation as Accepted
     await pool.query('UPDATE quotations SET status = $1 WHERE id = $2', ['Accepted', id]);
 
+    const display_id = await generateDisplayId(boutique_id, 'order', 'ORD');
+
     // Create order from quotation data
     const result = await pool.query(
-      `INSERT INTO orders (boutique_id, customer_name, category, total_amount, advance_paid, delivery_date, status)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE + INTERVAL '30 days', 'Received') RETURNING *`,
-      [boutique_id, q.customer_name, q.items, q.total_amount, advanceAmount]
+      `INSERT INTO orders (boutique_id, customer_name, category, total_amount, advance_paid, delivery_date, status, display_id)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE + INTERVAL '30 days', 'Received', $6) RETURNING *`,
+      [boutique_id, q.customer_name, q.items, q.total_amount, advanceAmount, display_id]
     );
     const newOrder = result.rows[0];
 

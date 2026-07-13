@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 const getQuotations = async (req, res) => {
   const boutique_id = req.user.boutique_id;
@@ -20,10 +21,12 @@ const addQuotation = async (req, res) => {
   }
 
   try {
+    const display_id = await generateDisplayId(boutique_id, 'quotation', 'QOT');
+
     const result = await pool.query(
-      `INSERT INTO quotations (boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft']
+      `INSERT INTO quotations (boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status, display_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft', display_id]
     );
     res.status(201).json({ message: 'Quotation created', quotation: result.rows[0] });
   } catch (error) {

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 // @route   GET /api/leads
 const getLeads = async (req, res) => {
@@ -17,9 +18,11 @@ const addLead = async (req, res) => {
   const { lead_id, name, phone, source, requirement, status, value } = req.body;
   const boutique_id = req.user.boutique_id;
   try {
+    const display_id = await generateDisplayId(boutique_id, 'lead', 'LEAD');
+
     const result = await pool.query(
-      'INSERT INTO leads (boutique_id, lead_id, name, phone, source, requirement, status, value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [boutique_id, lead_id, name, phone, source, requirement, status, value]
+      'INSERT INTO leads (boutique_id, lead_id, name, phone, source, requirement, status, value, display_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [boutique_id, display_id, name, phone, source, requirement, status || 'New', value || 0, display_id]
     );
     res.json(result.rows[0]);
   } catch (err) {

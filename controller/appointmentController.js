@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 const getAppointments = async (req, res) => {
   const boutique_id = req.user.boutique_id;
@@ -20,9 +21,11 @@ const addAppointment = async (req, res) => {
   }
 
   try {
+    const display_id = await generateDisplayId(boutique_id, 'appointment', 'APT');
+
     const result = await pool.query(
-      'INSERT INTO appointments (boutique_id, customer_name, type, date, time, notes, status, phone, assigned_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [boutique_id, customer_name, type, date, time, notes, status || 'Scheduled', phone, assigned_to]
+      'INSERT INTO appointments (boutique_id, customer_name, type, date, time, notes, status, phone, assigned_to, display_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [boutique_id, customer_name, type, date, time, notes, status || 'Scheduled', phone, assigned_to, display_id]
     );
     
     res.status(201).json({
