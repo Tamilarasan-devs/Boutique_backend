@@ -151,7 +151,11 @@ const runMigrations = async () => {
     // ── STEP 20: Initialize Default Roles for all existing boutiques ───────────
     const { initializeDefaultRoles } = require('./rolePermissions');
     const { createMarketingCampaignsTable } = require('./marketingCampaign');
+    const { createProductsTable } = require('./product');
     await createMarketingCampaignsTable();
+    await createProductsTable();
+    await run(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls JSONB DEFAULT '[]'::jsonb;`, 'products.image_urls');
+    
     const boutiquesResult = await pool.query('SELECT id FROM boutiques');
     for (const row of boutiquesResult.rows) {
       await initializeDefaultRoles(row.id);

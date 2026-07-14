@@ -52,6 +52,7 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const authRoutes = require('./routes/authRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -132,6 +133,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', verifyToken, settingsRoutes);
 app.use('/api/upload', verifyToken, uploadRoutes);
+app.use('/api/products', verifyToken, productRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

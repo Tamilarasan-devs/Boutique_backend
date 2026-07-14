@@ -18,8 +18,10 @@ router.post('/', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image provided' });
     }
     
+    const folder = req.body.folder || 'boutique_crm_quotations';
+    
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'boutique_crm_quotations'
+      folder: folder
     });
     
     // Clean up local file
