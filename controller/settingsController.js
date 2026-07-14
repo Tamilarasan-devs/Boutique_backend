@@ -67,69 +67,130 @@ exports.updateCompanyProfile = async (req, res) => {
   }
 };
 
-// Default system role definitions (matching backend and frontend expectations)
-const defaultRolePermissions = {
-  owner: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'Full' },
-  manager: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'None' },
-  sales_staff: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'None', 'Measurements': 'Read', 'Inventory': 'None', 'Billing': 'Full', 'Staff Management': 'None', 'Marketing': 'Full', 'Admin Settings': 'None' },
-  tailor: { 'Dashboard': 'Read', 'CRM': 'None', 'Orders': 'Read', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Read', 'Billing': 'None', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' },
-  receptionist: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Read', 'Production': 'None', 'Measurements': 'None', 'Inventory': 'None', 'Billing': 'Read', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' }
-};
-
 exports.getRoles = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT role, permissions FROM role_permissions WHERE boutique_id = $1', [boutique_id]);
+    const rolesResult = await pool.query('SELECT * FROM role_permissions WHERE boutique_id = $1 ORDER BY is_system DESC, name ASC', [boutique_id]);
+    const usersResult = await pool.query('SELECT role, COUNT(*) as count FROM users WHERE boutique_id = $1 GROUP BY role', [boutique_id]);
     
-    // Convert array of { role, permissions } to a map
-    const customPermissions = {};
-    result.rows.forEach(row => {
-      customPermissions[row.role] = row.permissions;
+    const userCounts = {};
+    usersResult.rows.forEach(row => {
+      userCounts[row.role] = parseInt(row.count, 10);
     });
 
-    // Merge defaults with custom permissions
-    const finalPermissions = {};
-    Object.keys(defaultRolePermissions).forEach(role => {
-      finalPermissions[role] = customPermissions[role] || defaultRolePermissions[role];
-    });
+    const finalRoles = rolesResult.rows.map(row => ({
+      id: row.role,
+      name: row.name,
+      description: row.description,
+      color: row.color,
+      is_system: row.is_system || false,
+      permissions: row.permissions,
+      users: userCounts[row.role] || 0
+    }));
 
-    res.json(finalPermissions);
+    res.json(finalRoles);
   } catch (error) {
     console.error('Error fetching roles:', error);
     res.status(500).json({ message: 'Server error fetching roles' });
   }
 };
 
+exports.createRole = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
+  const { name, description, color, permissions } = req.body;
+
+  if (!name || typeof permissions !== 'object') {
+    return res.status(400).json({ message: 'Name and permissions are required' });
+  }
+
+  const roleKey = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+  try {
+    // Check if exists
+    const existing = await pool.query('SELECT 1 FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, roleKey]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'A role with this name already exists' });
+    }
+
+    const query = `
+      INSERT INTO role_permissions (boutique_id, role, name, description, color, is_system, permissions)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
+    const result = await pool.query(query, [boutique_id, roleKey, name, description, color || 'bg-gray-100 text-gray-800 ring-gray-200', false, JSON.stringify(permissions)]);
+    
+    res.status(201).json({ message: 'Role created', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating role:', error);
+    res.status(500).json({ message: 'Server error creating role' });
+  }
+};
+
 exports.updateRolePermissions = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   const { role } = req.params;
-  const { permissions } = req.body;
+  const { permissions, name, description, color } = req.body;
 
-  if (role === 'owner') {
+  if (role === 'owner' && permissions) {
     return res.status(403).json({ message: 'Cannot modify owner permissions' });
   }
 
-  if (!defaultRolePermissions[role]) {
-    return res.status(404).json({ message: 'Role not found' });
-  }
-
-  if (typeof permissions !== 'object' || permissions === null || Array.isArray(permissions)) {
-    return res.status(400).json({ message: 'Permissions must be an object' });
-  }
-
   try {
+    const existing = await pool.query('SELECT is_system FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Role not found' });
+    }
+
     const query = `
-      INSERT INTO role_permissions (boutique_id, role, permissions)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (boutique_id, role) 
-      DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP
+      UPDATE role_permissions 
+      SET 
+        permissions = COALESCE($1, permissions), 
+        name = COALESCE($2, name),
+        description = COALESCE($3, description),
+        color = COALESCE($4, color),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE boutique_id = $5 AND role = $6
       RETURNING *;
     `;
-    const result = await pool.query(query, [boutique_id, role, JSON.stringify(permissions)]);
     
-    res.json({ message: 'Role permissions updated', data: result.rows[0] });
+    const result = await pool.query(query, [
+      permissions ? JSON.stringify(permissions) : null,
+      name,
+      description,
+      color,
+      boutique_id, 
+      role
+    ]);
+    
+    res.json({ message: 'Role updated', data: result.rows[0] });
   } catch (error) {
-    console.error('Error updating role permissions:', error);
-    res.status(500).json({ message: 'Server error updating role permissions' });
+    console.error('Error updating role:', error);
+    res.status(500).json({ message: 'Server error updating role' });
+  }
+};
+
+exports.deleteRole = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
+  const { role } = req.params;
+
+  try {
+    const existing = await pool.query('SELECT is_system FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Role not found' });
+    }
+    if (existing.rows[0].is_system) {
+      return res.status(403).json({ message: 'Cannot delete a system role' });
+    }
+    // Check if any users have this role
+    const usersResult = await pool.query('SELECT COUNT(*) FROM users WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+    if (parseInt(usersResult.rows[0].count, 10) > 0) {
+      return res.status(400).json({ message: 'Cannot delete role as it is assigned to users. Reassign users first.' });
+    }
+
+    await pool.query('DELETE FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+    res.json({ message: 'Role deleted' });
+  } catch (error) {
+    console.error('Error deleting role:', error);
+    res.status(500).json({ message: 'Server error deleting role' });
   }
 };

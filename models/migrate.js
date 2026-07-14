@@ -91,6 +91,7 @@ const runMigrations = async () => {
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'quotations.boutique_id');
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(255);`, 'quotations.customer_phone');
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255);`, 'quotations.customer_email');
+    await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS image_url TEXT;`, 'quotations.image_url');
 
     // ── STEP 9: production ────────────────────────────────────────────────────
     await run(`ALTER TABLE production ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'production.boutique_id');
@@ -126,6 +127,12 @@ const runMigrations = async () => {
     // ── STEP 18: email_logs ───────────────────────────────────────────────────
     await run(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'email_logs.boutique_id');
 
+    // ── STEP 18b: role_permissions ───────────────────────────────────────────
+    await run(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS name VARCHAR(100);`, 'role_permissions.name');
+    await run(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS description TEXT;`, 'role_permissions.description');
+    await run(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS color VARCHAR(50);`, 'role_permissions.color');
+    await run(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT FALSE;`, 'role_permissions.is_system');
+
     // ── STEP 19: Sequence Table & Display IDs ─────────────────────────────────
     await run(`
       CREATE TABLE IF NOT EXISTS boutique_sequences (
@@ -139,6 +146,13 @@ const runMigrations = async () => {
     const tablesWithDisplayId = ['orders', 'quotations', 'production', 'trials', 'appointments', 'followups', 'leads', 'invoices', 'payments', 'deliveries'];
     for (const table of tablesWithDisplayId) {
       await run(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS display_id VARCHAR(50);`, `${table}.display_id`);
+    }
+
+    // ── STEP 20: Initialize Default Roles for all existing boutiques ───────────
+    const { initializeDefaultRoles } = require('./rolePermissions');
+    const boutiquesResult = await pool.query('SELECT id FROM boutiques');
+    for (const row of boutiquesResult.rows) {
+      await initializeDefaultRoles(row.id);
     }
 
     console.log('[migrate] ✓ All migrations complete');

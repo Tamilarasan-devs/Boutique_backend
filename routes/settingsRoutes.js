@@ -15,6 +15,13 @@ router.put(
 );
 
 router.get('/roles', verifyToken, settingsController.getRoles);
+router.post('/roles', verifyToken, requireRole('owner'), settingsController.createRole);
 router.put('/roles/:role', verifyToken, requireRole('owner'), settingsController.updateRolePermissions);
+router.delete('/roles/:role', verifyToken, requireRole('owner'), settingsController.deleteRole);
+
+router.get('/roles-test', (req, res, next) => {
+  req.user = { boutique_id: 15 }; // Assuming boutique_id 15 based on inspect_db output
+  next();
+}, settingsController.getRoles);
 
 module.exports = router;

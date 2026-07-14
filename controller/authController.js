@@ -5,15 +5,6 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'boutique_crm_secret_key';
 const JWT_EXPIRES_IN = '7d';
 
-// Default system role definitions
-const defaultRolePermissions = {
-  owner: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'Full' },
-  manager: { 'Dashboard': 'Full', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Full', 'Billing': 'Full', 'Staff Management': 'Full', 'Marketing': 'Full', 'Admin Settings': 'None' },
-  sales_staff: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Full', 'Production': 'None', 'Measurements': 'Read', 'Inventory': 'None', 'Billing': 'Full', 'Staff Management': 'None', 'Marketing': 'Full', 'Admin Settings': 'None' },
-  tailor: { 'Dashboard': 'Read', 'CRM': 'None', 'Orders': 'Read', 'Production': 'Full', 'Measurements': 'Full', 'Inventory': 'Read', 'Billing': 'None', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' },
-  receptionist: { 'Dashboard': 'Read', 'CRM': 'Full', 'Orders': 'Read', 'Production': 'None', 'Measurements': 'None', 'Inventory': 'None', 'Billing': 'Read', 'Staff Management': 'None', 'Marketing': 'None', 'Admin Settings': 'None' }
-};
-
 // ─── Helper: sign token ───────────────────────────────────────────────────────
 const signToken = (user) =>
   jwt.sign(
@@ -53,6 +44,10 @@ const register = async (req, res) => {
       [boutique_id, boutiqueName || `${name}'s Boutique`]
     );
 
+    // 4. Initialize default roles for this boutique
+    const { initializeDefaultRoles } = require('../models/rolePermissions');
+    await initializeDefaultRoles(boutique_id);
+
     const user = result.rows[0];
     const token = signToken(user);
     res.status(201).json({ token, user });
@@ -90,15 +85,13 @@ const login = async (req, res) => {
     }
 
     // Fetch custom permissions for this role and boutique
-    let permissions = defaultRolePermissions[user.role] || [];
-    if (user.role !== 'owner') {
-      const permResult = await pool.query(
-        'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
-        [user.boutique_id, user.role]
-      );
-      if (permResult.rows.length > 0) {
-        permissions = permResult.rows[0].permissions;
-      }
+    let permissions = {};
+    const permResult = await pool.query(
+      'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
+      [user.boutique_id, user.role]
+    );
+    if (permResult.rows.length > 0) {
+      permissions = permResult.rows[0].permissions;
     }
 
     const token = signToken(user);
@@ -118,15 +111,15 @@ const createUser = async (req, res) => {
   const { name, email, password, role } = req.body;
   const boutique_id = req.user.boutique_id;
 
-  const allowedRoles = ['manager', 'sales_staff', 'tailor', 'receptionist'];
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'Name, email, password, and role are required.' });
   }
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` });
-  }
 
   try {
+    const roleCheck = await pool.query('SELECT 1 FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+    if (roleCheck.rows.length === 0) {
+      return res.status(400).json({ error: `Invalid role: ${role}` });
+    }
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (boutique_id, name, email, password_hash, role)
@@ -155,15 +148,13 @@ const getMe = async (req, res) => {
     }
     const user = result.rows[0];
 
-    let permissions = defaultRolePermissions[user.role] || [];
-    if (user.role !== 'owner') {
-      const permResult = await pool.query(
-        'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
-        [user.boutique_id, user.role]
-      );
-      if (permResult.rows.length > 0) {
-        permissions = permResult.rows[0].permissions;
-      }
+    let permissions = {};
+    const permResult = await pool.query(
+      'SELECT permissions FROM role_permissions WHERE boutique_id = $1 AND role = $2',
+      [user.boutique_id, user.role]
+    );
+    if (permResult.rows.length > 0) {
+      permissions = permResult.rows[0].permissions;
     }
 
     res.json({ ...user, permissions });
@@ -194,7 +185,15 @@ const getUsers = async (req, res) => {
 const updateUser = async (req, res) => {
   const { id } = req.params;
   const { name, role, is_active } = req.body;
+  const boutique_id = req.user.boutique_id;
+  
   try {
+    if (role) {
+      const roleCheck = await pool.query('SELECT 1 FROM role_permissions WHERE boutique_id = $1 AND role = $2', [boutique_id, role]);
+      if (roleCheck.rows.length === 0) {
+        return res.status(400).json({ error: `Invalid role: ${role}` });
+      }
+    }
     const result = await pool.query(
       `UPDATE users SET name = COALESCE($1, name), role = COALESCE($2, role), is_active = COALESCE($3, is_active)
        WHERE id = $4 AND role != 'owner' RETURNING id, name, email, role, is_active`,
