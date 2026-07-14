@@ -150,6 +150,8 @@ const runMigrations = async () => {
 
     // ── STEP 20: Initialize Default Roles for all existing boutiques ───────────
     const { initializeDefaultRoles } = require('./rolePermissions');
+    const { createMarketingCampaignsTable } = require('./marketingCampaign');
+    await createMarketingCampaignsTable();
     const boutiquesResult = await pool.query('SELECT id FROM boutiques');
     for (const row of boutiquesResult.rows) {
       await initializeDefaultRoles(row.id);
