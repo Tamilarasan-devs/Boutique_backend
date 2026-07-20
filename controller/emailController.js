@@ -3,6 +3,7 @@ const pool = require('../config/db');
 // POST /api/email/log — save a sent email record
 const logEmail = async (req, res) => {
   const { to_email, to_name, subject, message, template_name, status, error_message } = req.body;
+  const boutique_id = req.user.boutique_id;
 
   if (!to_email || !subject || !message) {
     return res.status(400).json({ error: 'to_email, subject, and message are required' });
@@ -10,9 +11,10 @@ const logEmail = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO email_logs (to_email, to_name, subject, message, template_name, status, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO email_logs (boutique_id, to_email, to_name, subject, message, template_name, status, error_message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
+        boutique_id,
         to_email,
         to_name || null,
         subject,
@@ -32,10 +34,11 @@ const logEmail = async (req, res) => {
 // GET /api/email/logs — get all email logs with pagination + search
 const getEmailLogs = async (req, res) => {
   const { search, status, page, limit } = req.query;
+  const boutique_id = req.user.boutique_id;
 
-  let conditions = [];
-  const params = [];
-  let idx = 1;
+  let conditions = [`boutique_id = $1`];
+  const params = [boutique_id];
+  let idx = 2;
 
   if (search) {
     conditions.push(`(to_email ILIKE $${idx} OR to_name ILIKE $${idx} OR subject ILIKE $${idx})`);
@@ -77,6 +80,7 @@ const getEmailLogs = async (req, res) => {
 
 // GET /api/email/stats — summary stats for the dashboard strip
 const getEmailStats = async (req, res) => {
+  const boutique_id = req.user.boutique_id;
   try {
     const result = await pool.query(`
       SELECT
@@ -85,7 +89,8 @@ const getEmailStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'failed') AS failed,
         COUNT(*) FILTER (WHERE sent_at >= CURRENT_DATE) AS sent_today
       FROM email_logs
-    `);
+      WHERE boutique_id = $1
+    `, [boutique_id]);
     res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching email stats:', error);
@@ -96,8 +101,9 @@ const getEmailStats = async (req, res) => {
 // DELETE /api/email/logs/:id — delete a log record
 const deleteEmailLog = async (req, res) => {
   const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('DELETE FROM email_logs WHERE id=$1 RETURNING *', [id]);
+    const result = await pool.query('DELETE FROM email_logs WHERE id=$1 AND boutique_id=$2 RETURNING *', [id, boutique_id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Log not found' });
     res.status(200).json({ message: 'Log deleted' });
   } catch (error) {
