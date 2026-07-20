@@ -4,8 +4,22 @@ const pool = require('../config/db');
 const getSuppliers = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM suppliers WHERE boutique_id = $1 ORDER BY id DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM suppliers WHERE boutique_id = $1`, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM suppliers WHERE boutique_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching suppliers:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -64,9 +78,32 @@ const deleteSupplier = async (req, res) => {
 // --- Inventory Items (Fabrics & Accessories) ---
 const getItems = async (req, res) => {
   const boutique_id = req.user.boutique_id;
+  const type = req.query.type;
   try {
-    const result = await pool.query('SELECT * FROM inventory_items WHERE boutique_id = $1 ORDER BY id DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    let countQuery = `SELECT COUNT(*) FROM inventory_items WHERE boutique_id = $1`;
+    let query = `SELECT * FROM inventory_items WHERE boutique_id = $1`;
+    const params = [boutique_id];
+
+    if (type) {
+      params.push(type);
+      countQuery += ` AND type = $${params.length}`;
+      query += ` AND type = $${params.length}`;
+    }
+
+    const countRes = await pool.query(countQuery, params);
+    const total = parseInt(countRes.rows[0].count);
+
+    query += ` ORDER BY id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    const result = await pool.query(query, [...params, limit, offset]);
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching inventory items:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -126,8 +163,22 @@ const deleteItem = async (req, res) => {
 const getPurchases = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM purchases WHERE boutique_id = $1 ORDER BY id DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM purchases WHERE boutique_id = $1`, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM purchases WHERE boutique_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching purchases:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -204,8 +255,22 @@ const updatePurchaseStatus = async (req, res) => {
 const getStockLedger = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM stock_ledger WHERE boutique_id = $1 ORDER BY id DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM stock_ledger WHERE boutique_id = $1`, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM stock_ledger WHERE boutique_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching stock ledger:', error);
     res.status(500).json({ error: 'Internal server error' });

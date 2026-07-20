@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { verifyToken } = require('./middleware/auth');
+const helmet = require('helmet');
+const { authLimiter } = require('./middleware/rateLimiter');
 
 // Models
 const { createCustomersTable } = require('./models/customer');
@@ -53,9 +55,10 @@ const authRoutes = require('./routes/authRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const productRoutes = require('./routes/productRoutes');
+const posBillingRoutes = require('./routes/posBillingRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
 const ALLOWED_ORIGINS = [
@@ -78,7 +81,15 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow Cloudinary images
+  contentSecurityPolicy: false, // handled by frontend
+}));
+
+// Body size cap — prevents DOS via large payloads
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Initialize Database Tables
 const initDB = async () => {
@@ -102,7 +113,7 @@ const initDB = async () => {
   await createAttendanceTable();
   await createEmailLogsTable();
   await createLeadsTable();
-  await createUsersTable();
+  // NOTE: createUsersTable already called above (line 87) — removed duplicate call
   await createRolePermissionsTable();
   await createSubscriptionsTable();
   await createSettingsTable();
@@ -130,18 +141,35 @@ app.use('/api/campaigns', verifyToken, campaignRoutes);
 app.use('/api/leads', verifyToken, leadRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/webhooks', webhookRoutes);
+// Rate-limit auth endpoints before processing
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', verifyToken, settingsRoutes);
 app.use('/api/upload', verifyToken, uploadRoutes);
 app.use('/api/products', verifyToken, productRoutes);
+app.use('/api/pos-billing', posBillingRoutes);
 
-// Basic route
+// Health-check routes
 app.get('/', (req, res) => {
-  res.send('Boutique CRM API is running...');
+  res.json({ status: 'ok', service: 'Boutique CRM API' });
 });
-// Basic route
-app.get('/test', (req, res) => {
-  res.send('Boutique CRM API is running...');
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ─── 404 handler — must be AFTER all routes ───────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// ─── Global error handler ─────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[GlobalError]', err.message, err.stack);
+  // Don't leak internal error details to clients
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: status === 500 ? 'Internal server error.' : err.message });
 });
 
 // Start Server

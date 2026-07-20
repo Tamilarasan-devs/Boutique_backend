@@ -10,6 +10,7 @@ const createProductsTable = async () => {
       price DECIMAL(10, 2) NOT NULL,
       stock_quantity INT NOT NULL DEFAULT 0,
       category VARCHAR(100),
+      barcode VARCHAR(255) UNIQUE,
       image_url TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

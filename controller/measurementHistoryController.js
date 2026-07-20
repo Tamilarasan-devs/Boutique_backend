@@ -3,7 +3,14 @@ const pool = require('../config/db');
 // Get all measurement history
 exports.getAllHistory = async (req, res) => {
   const boutique_id = req.user.boutique_id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page - 1) * limit;
+
   try {
+    const countRes = await pool.query('SELECT COUNT(*) FROM measurement_history WHERE boutique_id = $1', [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
     const result = await pool.query(`
       SELECT mh.*, c.name as customer_name, mt.name as template_name 
       FROM measurement_history mh
@@ -11,8 +18,13 @@ exports.getAllHistory = async (req, res) => {
       LEFT JOIN measurement_templates mt ON mh.template_id = mt.id
       WHERE mh.boutique_id = $1
       ORDER BY mh.updated_at DESC
-    `, [boutique_id]);
-    res.status(200).json(result.rows);
+      LIMIT $2 OFFSET $3
+    `, [boutique_id, limit, offset]);
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

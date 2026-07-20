@@ -4,8 +4,23 @@ const { generateDisplayId } = require('../utils/sequenceGenerator');
 const getQuotations = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM quotations WHERE boutique_id = $1 ORDER BY created_at DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM quotations WHERE boutique_id = $1`, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM quotations WHERE boutique_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching quotations:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -13,7 +28,7 @@ const getQuotations = async (req, res) => {
 };
 
 const addQuotation = async (req, res) => {
-  const { customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status, image_url } = req.body;
+  const { customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status, image_url, lead_id } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !items || !total_amount || !valid_until) {
@@ -24,9 +39,9 @@ const addQuotation = async (req, res) => {
     const display_id = await generateDisplayId(boutique_id, 'quotation', 'QOT');
 
     const result = await pool.query(
-      `INSERT INTO quotations (boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status, display_id, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-      [boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft', display_id, image_url || null]
+      `INSERT INTO quotations (boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount, date, valid_until, terms, status, display_id, image_url, lead_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [boutique_id, customer_name, customer_phone, customer_email, items, total_amount, discount || 0, date || new Date(), valid_until, terms || '', status || 'Draft', display_id, image_url || null, lead_id || null]
     );
     res.status(201).json({ message: 'Quotation created', quotation: result.rows[0] });
   } catch (error) {
@@ -57,7 +72,14 @@ const deleteQuotation = async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM quotations WHERE id = $1 AND boutique_id = $2 RETURNING *', [id, boutique_id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Quotation not found' });
-    res.status(200).json({ message: 'Quotation deleted', quotation: result.rows[0] });
+    
+    // If quotation was created from a lead, revert lead status to Qualified
+    const deletedQuotation = result.rows[0];
+    if (deletedQuotation.lead_id) {
+      await pool.query('UPDATE leads SET status = $1 WHERE id = $2 AND boutique_id = $3', ['Qualified', deletedQuotation.lead_id, boutique_id]);
+    }
+
+    res.status(200).json({ message: 'Quotation deleted', quotation: deletedQuotation });
   } catch (error) {
     console.error('Error deleting quotation:', error);
     res.status(500).json({ error: 'Internal server error' });

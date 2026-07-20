@@ -3,15 +3,35 @@ const { generateDisplayId } = require('../utils/sequenceGenerator');
 
 const getDeliveries = async (req, res) => {
   const boutique_id = req.user.boutique_id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
   try {
-    const result = await pool.query(`
-      SELECT d.*, COALESCE(NULLIF(d.phone, ''), c.phone, '') as phone
+    const countRes = await pool.query(`
+      SELECT COUNT(*) FROM deliveries d
+      WHERE d.boutique_id = $1
+      `, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `
+      SELECT d.*, 
+        COALESCE(
+          NULLIF(d.phone, ''), 
+          (SELECT phone FROM customers c WHERE c.name = d.customer_name AND c.boutique_id = d.boutique_id LIMIT 1), 
+          ''
+        ) as phone
       FROM deliveries d
-      LEFT JOIN customers c ON d.customer_name = c.name AND d.boutique_id = c.boutique_id
       WHERE d.boutique_id = $1
       ORDER BY d.created_at DESC
-    `, [boutique_id]);
-    res.status(200).json(result.rows);
+      LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching deliveries:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -56,6 +56,9 @@ const runMigrations = async () => {
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS website VARCHAR(255);`, 'boutique_settings.website');
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'INR';`, 'boutique_settings.currency');
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS invoice_prefix VARCHAR(20) DEFAULT 'INV';`, 'boutique_settings.invoice_prefix');
+    await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS loyalty_enabled BOOLEAN DEFAULT FALSE;`, 'boutique_settings.loyalty_enabled');
+    await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS points_per_unit NUMERIC(10,2) DEFAULT 100;`, 'boutique_settings.points_per_unit');
+    await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS redemption_value NUMERIC(10,2) DEFAULT 1;`, 'boutique_settings.redemption_value');
 
     // Unique constraint on boutique_settings.boutique_id
     await run(`
@@ -68,6 +71,7 @@ const runMigrations = async () => {
 
     // ── STEP 4: customers ─────────────────────────────────────────────────────
     await run(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'customers.boutique_id');
+    await run(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS loyalty_points INT DEFAULT 0;`, 'customers.loyalty_points');
 
     // ── STEP 5: appointments ──────────────────────────────────────────────────
     await run(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'appointments.boutique_id');
@@ -86,12 +90,16 @@ const runMigrations = async () => {
     await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'Normal';`, 'orders.priority');
     await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS advance_paid NUMERIC(10,2);`, 'orders.advance_paid');
     await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stitching_cost NUMERIC(10,2);`, 'orders.stitching_cost');
+    await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS loyalty_discount NUMERIC(10,2) DEFAULT 0;`, 'orders.loyalty_discount');
+    await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS points_redeemed INT DEFAULT 0;`, 'orders.points_redeemed');
+    await run(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS points_earned INT DEFAULT 0;`, 'orders.points_earned');
 
     // ── STEP 8: quotations ────────────────────────────────────────────────────
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'quotations.boutique_id');
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(255);`, 'quotations.customer_phone');
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255);`, 'quotations.customer_email');
     await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS image_url TEXT;`, 'quotations.image_url');
+    await run(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS lead_id INT REFERENCES leads(id) ON DELETE SET NULL;`, 'quotations.lead_id');
 
     // ── STEP 9: production ────────────────────────────────────────────────────
     await run(`ALTER TABLE production ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'production.boutique_id');

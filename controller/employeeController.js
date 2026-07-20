@@ -54,8 +54,8 @@ const getEmployees = async (req, res) => {
       const l = parseInt(limit, 10) || 10;
       const paginated = rows.slice((p - 1) * l, p * l);
       return res.status(200).json({
-        employees: paginated,
-        meta: { page: p, limit: l, total: rows.length, totalPages: Math.ceil(rows.length / l) }
+        data: paginated,
+        pagination: { page: p, limit: l, total: rows.length, totalPages: Math.ceil(rows.length / l) }
       });
     }
 

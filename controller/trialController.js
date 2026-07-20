@@ -4,8 +4,23 @@ const { generateDisplayId } = require('../utils/sequenceGenerator');
 const getTrials = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
-    const result = await pool.query('SELECT * FROM trials WHERE boutique_id = $1 ORDER BY date DESC', [boutique_id]);
-    res.status(200).json(result.rows);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM trials WHERE boutique_id = $1`, [boutique_id]);
+    const total = parseInt(countRes.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM trials WHERE boutique_id = $1 ORDER BY date DESC LIMIT $2 OFFSET $3`,
+      [boutique_id, limit, offset]
+    );
+
+    res.status(200).json({
+      data: result.rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+    });
   } catch (error) {
     console.error('Error fetching trials:', error);
     res.status(500).json({ error: 'Internal server error' });

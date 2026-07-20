@@ -80,8 +80,8 @@ const getCustomers = async (req, res) => {
       const paginated = result.rows.slice(startIndex, endIndex);
       
       return res.status(200).json({
-        customers: paginated,
-        meta: {
+        data: paginated,
+        pagination: {
           page: p,
           limit: l,
           total: result.rows.length,
@@ -90,7 +90,16 @@ const getCustomers = async (req, res) => {
       });
     }
     
-    res.status(200).json(result.rows);
+    // Default fallback to new standard if no page/limit provided to avoid breaking frontend that expects standard format
+    return res.status(200).json({
+      data: result.rows,
+      pagination: {
+        page: 1,
+        limit: result.rows.length,
+        total: result.rows.length,
+        totalPages: 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching customers:', error);
     res.status(500).json({ error: 'Internal server error' });

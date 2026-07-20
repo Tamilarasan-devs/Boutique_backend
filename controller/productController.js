@@ -25,7 +25,7 @@ const getProducts = async (req, res) => {
 // @access  Private
 const createProduct = async (req, res) => {
   const boutique_id = req.user.boutique_id;
-  const { name, description, price, stock_quantity, category, image_url, image_urls } = req.body;
+  const { name, description, price, stock_quantity, category, barcode, image_url, image_urls } = req.body;
 
   if (!name || !price) {
     return res.status(400).json({ error: 'Name and price are required.' });
@@ -34,9 +34,9 @@ const createProduct = async (req, res) => {
   try {
     const result = await pool.query(
       `INSERT INTO products 
-        (boutique_id, name, description, price, stock_quantity, category, image_url, image_urls)
+        (boutique_id, name, description, price, stock_quantity, category, barcode, image_url, image_urls)
        VALUES 
-        ($1, $2, $3, $4, $5, $6, $7, $8)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         boutique_id, 
@@ -45,6 +45,7 @@ const createProduct = async (req, res) => {
         price, 
         stock_quantity || 0, 
         category, 
+        barcode || null,
         image_url,
         image_urls ? JSON.stringify(image_urls) : '[]'
       ]
@@ -63,15 +64,15 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   const { id } = req.params;
   const boutique_id = req.user.boutique_id;
-  const { name, description, price, stock_quantity, category, image_url, image_urls } = req.body;
+  const { name, description, price, stock_quantity, category, barcode, image_url, image_urls } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE products 
-       SET name = $1, description = $2, price = $3, stock_quantity = $4, category = $5, image_url = $6, image_urls = $7, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8 AND boutique_id = $9 
+       SET name = $1, description = $2, price = $3, stock_quantity = $4, category = $5, barcode = $6, image_url = $7, image_urls = $8, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $9 AND boutique_id = $10 
        RETURNING *`,
-      [name, description, price, stock_quantity, category, image_url, image_urls ? JSON.stringify(image_urls) : '[]', id, boutique_id]
+      [name, description, price, stock_quantity, category, barcode || null, image_url, image_urls ? JSON.stringify(image_urls) : '[]', id, boutique_id]
     );
 
     if (result.rows.length === 0) {

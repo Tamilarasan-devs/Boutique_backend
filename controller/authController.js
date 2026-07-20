@@ -1,8 +1,14 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { initializeDefaultRoles } = require('../models/rolePermissions');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'boutique_crm_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set! Server will not start securely.');
+  process.exit(1);
+}
+
 const JWT_EXPIRES_IN = '7d';
 
 // ─── Helper: sign token ───────────────────────────────────────────────────────
@@ -45,8 +51,8 @@ const register = async (req, res) => {
     );
 
     // 4. Initialize default roles for this boutique
-    const { initializeDefaultRoles } = require('../models/rolePermissions');
     await initializeDefaultRoles(boutique_id);
+
 
     const user = result.rows[0];
     const token = signToken(user);
@@ -56,7 +62,8 @@ const register = async (req, res) => {
       return res.status(409).json({ error: 'Email is already registered.' });
     }
     console.error('Register error:', err.message, '| code:', err.code, '| detail:', err.detail, '| stack:', err.stack);
-    res.status(500).json({ error: 'Server error during registration.', detail: err.message });
+    // Do NOT expose err.message to clients in production
+    res.status(500).json({ error: 'Server error during registration.' });
   }
 };
 
@@ -186,6 +193,11 @@ const updateUser = async (req, res) => {
   const { id } = req.params;
   const { name, role, is_active } = req.body;
   const boutique_id = req.user.boutique_id;
+
+  // Prevent updating the requesting user's own account through this endpoint
+  if (parseInt(id) === req.user.id) {
+    return res.status(400).json({ error: 'Use /api/auth/me to update your own account.' });
+  }
   
   try {
     if (role) {
@@ -194,13 +206,14 @@ const updateUser = async (req, res) => {
         return res.status(400).json({ error: `Invalid role: ${role}` });
       }
     }
+    // SECURITY FIX: Added boutique_id = $5 condition to prevent cross-tenant updates
     const result = await pool.query(
       `UPDATE users SET name = COALESCE($1, name), role = COALESCE($2, role), is_active = COALESCE($3, is_active)
-       WHERE id = $4 AND role != 'owner' RETURNING id, name, email, role, is_active`,
-      [name, role, is_active, id]
+       WHERE id = $4 AND boutique_id = $5 AND role != 'owner' RETURNING id, name, email, role, is_active`,
+      [name, role, is_active, id, boutique_id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found.' });
+      return res.status(404).json({ error: 'User not found or you do not have permission.' });
     }
     res.json({ message: 'User updated.', user: result.rows[0] });
   } catch (err) {
@@ -212,10 +225,12 @@ const updateUser = async (req, res) => {
 // ─── DELETE /api/auth/users/:id ───────────────────────────────────────────────
 const deleteUser = async (req, res) => {
   const { id } = req.params;
+  const boutique_id = req.user.boutique_id;
   try {
+    // SECURITY FIX: Added boutique_id = $2 condition to prevent cross-tenant deletes
     const result = await pool.query(
-      "DELETE FROM users WHERE id = $1 AND role != 'owner' RETURNING id",
-      [id]
+      "DELETE FROM users WHERE id = $1 AND boutique_id = $2 AND role != 'owner' RETURNING id",
+      [id, boutique_id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found or cannot delete owner.' });

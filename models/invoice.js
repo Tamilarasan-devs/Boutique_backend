@@ -14,6 +14,7 @@ const createInvoicesTable = async () => {
       total_amount NUMERIC(10, 2) NOT NULL,
       status VARCHAR(50) NOT NULL DEFAULT 'Pending',
       items TEXT NOT NULL,
+      invoice_type VARCHAR(50) DEFAULT 'Standard',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;

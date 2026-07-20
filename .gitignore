@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Sensitive credentials — NEVER commit
+google-credentials.json
+
+# Build artifacts
+dist/
+dist.zip
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# Test artifacts
+coverage/
+test-results/
+playwright-report/

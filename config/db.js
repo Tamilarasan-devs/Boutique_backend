@@ -23,8 +23,9 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Log but do NOT exit — pg pool handles reconnection automatically.
+  // process.exit() here would crash the whole server on a transient DB hiccup.
+  console.error('[DB] Unexpected error on idle client:', err.message);
 });
 
 module.exports = pool;
