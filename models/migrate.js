@@ -131,6 +131,8 @@ const runMigrations = async () => {
     // ── STEP 17: leads ────────────────────────────────────────────────────────
     await run(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'leads.boutique_id');
     await run(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`, 'leads.updated_at');
+    await run(`ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_lead_id_key;`, 'drop global lead_id unique constraint');
+    await run(`ALTER TABLE leads ADD CONSTRAINT leads_boutique_id_lead_id_key UNIQUE (boutique_id, lead_id);`, 'add boutique scoped lead_id unique constraint');
 
     // ── STEP 18: email_logs ───────────────────────────────────────────────────
     await run(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE;`, 'email_logs.boutique_id');
