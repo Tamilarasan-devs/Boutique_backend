@@ -192,6 +192,10 @@ const convertFromQuotation = async (req, res) => {
     if (quotResult.rows.length === 0) return res.status(404).json({ error: 'Quotation not found' });
     const q = quotResult.rows[0];
 
+    if (q.status === 'Accepted' || q.status === 'Invoiced') {
+      return res.status(400).json({ error: 'An order has already been created from this quotation.' });
+    }
+
     // Mark quotation as Accepted
     await pool.query('UPDATE quotations SET status = $1 WHERE id = $2', ['Accepted', id]);
 

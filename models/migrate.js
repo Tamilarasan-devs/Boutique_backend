@@ -59,6 +59,7 @@ const runMigrations = async () => {
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS loyalty_enabled BOOLEAN DEFAULT FALSE;`, 'boutique_settings.loyalty_enabled');
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS points_per_unit NUMERIC(10,2) DEFAULT 100;`, 'boutique_settings.points_per_unit');
     await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS redemption_value NUMERIC(10,2) DEFAULT 1;`, 'boutique_settings.redemption_value');
+    await run(`ALTER TABLE boutique_settings ADD COLUMN IF NOT EXISTS logo_url VARCHAR(1024);`, 'boutique_settings.logo_url');
 
     // Unique constraint on boutique_settings.boutique_id
     await run(`

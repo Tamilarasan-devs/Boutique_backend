@@ -21,13 +21,13 @@ exports.updateCompanyProfile = async (req, res) => {
   const {
     name, tagline, email, phone, gst, pan,
     address, city, state, pincode, website, currency, invoicePrefix,
-    loyalty_enabled, points_per_unit, redemption_value
+    loyalty_enabled, points_per_unit, redemption_value, logoUrl
   } = req.body;
 
   try {
     const updateQuery = `
-      INSERT INTO boutique_settings (boutique_id, name, tagline, email, phone, gst, pan, address, city, state, pincode, website, currency, invoice_prefix, loyalty_enabled, points_per_unit, redemption_value)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      INSERT INTO boutique_settings (boutique_id, name, tagline, email, phone, gst, pan, address, city, state, pincode, website, currency, invoice_prefix, loyalty_enabled, points_per_unit, redemption_value, logo_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       ON CONFLICT (boutique_id) DO UPDATE SET
         name = COALESCE(EXCLUDED.name, boutique_settings.name),
         tagline = COALESCE(EXCLUDED.tagline, boutique_settings.tagline),
@@ -45,6 +45,7 @@ exports.updateCompanyProfile = async (req, res) => {
         loyalty_enabled = COALESCE(EXCLUDED.loyalty_enabled, boutique_settings.loyalty_enabled),
         points_per_unit = COALESCE(EXCLUDED.points_per_unit, boutique_settings.points_per_unit),
         redemption_value = COALESCE(EXCLUDED.redemption_value, boutique_settings.redemption_value),
+        logo_url = COALESCE(EXCLUDED.logo_url, boutique_settings.logo_url),
         updated_at = CURRENT_TIMESTAMP
       RETURNING *;
     `;
@@ -52,7 +53,7 @@ exports.updateCompanyProfile = async (req, res) => {
     const values = [
       boutique_id, name, tagline, email, phone, gst, pan,
       address, city, state, pincode, website, currency, invoicePrefix,
-      loyalty_enabled, points_per_unit, redemption_value
+      loyalty_enabled, points_per_unit, redemption_value, logoUrl
     ].map(v => v === undefined ? null : v);
 
     const result = await pool.query(updateQuery, values);
