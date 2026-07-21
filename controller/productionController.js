@@ -29,6 +29,7 @@ const getProduction = async (req, res) => {
 
 const addProduction = async (req, res) => {
   const { order_id, customer_name, garment, tailor, stage, priority, start_date, expected_end_date, notes } = req.body;
+  let { common_id } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !garment) {
@@ -38,10 +39,32 @@ const addProduction = async (req, res) => {
   try {
     const display_id = await generateDisplayId(boutique_id, 'production', 'PRD');
 
+    // Attempt to automatically resolve common_id from orders table if order_id is provided
+    if (!common_id && order_id) {
+      let queryColumn = 'id';
+      let queryValue = order_id;
+      
+      if (typeof order_id === 'string' && order_id.startsWith('ORD-')) {
+        const potentialNum = parseInt(order_id.replace('ORD-', ''), 10);
+        if (!isNaN(potentialNum)) {
+           queryValue = potentialNum;
+        } else {
+           queryColumn = 'display_id';
+        }
+      } else if (!isNaN(parseInt(order_id, 10))) {
+        queryValue = parseInt(order_id, 10);
+      }
+
+      const orderRes = await pool.query(`SELECT common_id FROM orders WHERE ${queryColumn} = $1 AND boutique_id = $2`, [queryValue, boutique_id]);
+      if (orderRes.rows.length > 0) {
+        common_id = orderRes.rows[0].common_id;
+      }
+    }
+
     const result = await pool.query(
-      `INSERT INTO production (boutique_id, order_id, customer_name, garment, tailor, stage, priority, start_date, expected_end_date, notes, display_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [boutique_id, order_id || '', customer_name, garment, tailor || '', stage || 'Cutting', priority || 'Medium', start_date || new Date(), expected_end_date, notes || '', display_id]
+      `INSERT INTO production (boutique_id, order_id, customer_name, garment, tailor, stage, priority, start_date, expected_end_date, notes, display_id, common_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [boutique_id, order_id || '', customer_name, garment, tailor || '', stage || 'Cutting', priority || 'Medium', start_date || new Date(), expected_end_date, notes || '', display_id, common_id || null]
     );
     res.status(201).json({ message: 'Production item added', production: result.rows[0] });
   } catch (error) {

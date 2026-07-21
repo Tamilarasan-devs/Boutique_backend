@@ -302,7 +302,60 @@ const updateOrder = async (req, res) => {
   }
 };
 
+
+const trackOrderByCommonId = async (req, res) => {
+  const { common_id } = req.params;
+  const boutique_id = req.user.boutique_id;
+
+  if (!common_id) {
+    return res.status(400).json({ error: 'common_id is required' });
+  }
+
+  try {
+    const results = {};
+
+    // Fetch Lead
+    const leadRes = await pool.query('SELECT * FROM leads WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.lead = leadRes.rows[0] || null;
+
+    // Fetch Quotation
+    const quotRes = await pool.query('SELECT * FROM quotations WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.quotation = quotRes.rows[0] || null;
+
+    // Fetch Order
+    const orderRes = await pool.query('SELECT * FROM orders WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.order = orderRes.rows[0] || null;
+
+    // Fetch Production
+    const prodRes = await pool.query('SELECT * FROM production WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.production = prodRes.rows[0] || null;
+
+    // Fetch Trial
+    const trialRes = await pool.query('SELECT * FROM trials WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.trial = trialRes.rows[0] || null;
+
+    // Fetch Delivery
+    const delRes = await pool.query('SELECT * FROM deliveries WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.delivery = delRes.rows[0] || null;
+
+    // Fetch Invoice
+    const invRes = await pool.query('SELECT * FROM invoices WHERE common_id = $1 AND boutique_id = $2', [common_id, boutique_id]);
+    results.invoice = invRes.rows[0] || null;
+
+    // Check if any exist
+    if (!results.lead && !results.quotation && !results.order && !results.production && !results.trial && !results.delivery && !results.invoice) {
+      return res.status(404).json({ error: 'No tracking data found for the provided common ID' });
+    }
+
+    res.status(200).json(results);
+  } catch (error) {
+    console.error('Error tracking order:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
+  trackOrderByCommonId,
   getOrders,
   addOrder,
   updateOrderStatus,

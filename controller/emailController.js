@@ -3,6 +3,7 @@ const pool = require('../config/db');
 // POST /api/email/log — save a sent email record
 const logEmail = async (req, res) => {
   const { to_email, to_name, subject, message, template_name, status, error_message } = req.body;
+  const sender_email = req.user.email;
   const boutique_id = req.user.boutique_id;
 
   if (!to_email || !subject || !message) {
@@ -11,8 +12,8 @@ const logEmail = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO email_logs (boutique_id, to_email, to_name, subject, message, template_name, status, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO email_logs (boutique_id, to_email, to_name, subject, message, template_name, status, error_message, sender_email)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
         boutique_id,
         to_email,

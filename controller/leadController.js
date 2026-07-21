@@ -19,10 +19,11 @@ const addLead = async (req, res) => {
   const boutique_id = req.user.boutique_id;
   try {
     const display_id = await generateDisplayId(boutique_id, 'lead', 'LEAD');
+    const common_id = await generateDisplayId(boutique_id, 'common_order', 'ORD');
 
     const result = await pool.query(
-      'INSERT INTO leads (boutique_id, lead_id, name, phone, source, requirement, status, value, display_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [boutique_id, display_id, name, phone, source, requirement, status || 'New', value || 0, display_id]
+      'INSERT INTO leads (boutique_id, lead_id, name, phone, source, requirement, status, value, display_id, common_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [boutique_id, display_id, name, phone, source, requirement, status || 'New', value || 0, display_id, common_id]
     );
     res.json(result.rows[0]);
   } catch (err) {

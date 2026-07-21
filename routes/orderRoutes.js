@@ -7,7 +7,8 @@ const {
   deleteOrder, 
   convertFromQuotation,
   getOrderById,
-  updateOrder
+  updateOrder,
+  trackOrderByCommonId
 } = require('../controller/orderController');
 
 // @route   GET /api/orders
@@ -15,6 +16,9 @@ router.get('/', getOrders);
 
 // @route   POST /api/orders
 router.post('/', addOrder);
+
+// @route   GET /api/orders/track/:common_id
+router.get('/track/:common_id', trackOrderByCommonId);
 
 // @route   GET /api/orders/:id
 router.get('/:id', getOrderById);

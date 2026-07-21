@@ -86,7 +86,7 @@ const getInvoiceById = async (req, res) => {
 };
 
 const createInvoice = async (req, res) => {
-  const { order_id, quotation_id, customer_name, invoice_date, due_date, total_amount, items, status } = req.body;
+  const { order_id, quotation_id, customer_name, invoice_date, due_date, total_amount, items, status, common_id } = req.body;
   const boutique_id = req.user.boutique_id;
 
   if (!customer_name || !due_date || total_amount === undefined || total_amount === null || !items) {

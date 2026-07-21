@@ -6,6 +6,7 @@ const createEmailLogsTable = async () => {
       id SERIAL PRIMARY KEY,
       boutique_id INT REFERENCES boutiques(id) ON DELETE CASCADE,
       to_email VARCHAR(255) NOT NULL,
+      sender_email VARCHAR(255),
       to_name VARCHAR(255),
       subject VARCHAR(500) NOT NULL,
       message TEXT NOT NULL,
